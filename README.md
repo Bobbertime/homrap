@@ -30,10 +30,10 @@ Il file vuoto `.nojekyll` dice a GitHub di pubblicare i file così come sono: la
 Dopo ogni modifica ai file, apri `sw.js` e cambia la riga
 
 ```js
-const VERSIONE = 'homrap-1.0.0';
+const VERSIONE = 'homrap-1.0.1';
 ```
 
-per esempio in `homrap-1.0.1`. Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
+per esempio in `homrap-1.0.2`. Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
 
 ### Provarla sul computer
 
