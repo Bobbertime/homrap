@@ -1,12 +1,13 @@
 // Scheda Oggi: allenamento del giorno o riposo, striscia della settimana, avvisi e sfida del mese.
 import { S, salva, contesto, oggi, ultimoTest } from '../stato.js';
 import { t, tn, nomeEsercizio } from '../i18n.js';
-import { registra, disegna } from '../router.js';
+import { registra, disegna, vai } from '../router.js';
 import { esc, ico, icoPlay, foglio, toast, fmtPunti, fmtData } from '../ui.js';
 import { prossimo, circuitoSessione, serieGiorni, valutaProgressione, applicaModifiche, settimanaBlocco, inRipartenza, giorniDiPausa, alternative } from '../logica.js';
 import { sfidaDelMese, migliorSfida } from '../classifica.js';
 import { lunedi, piuGiorni, giornoSett, meseISO, daIso } from '../util.js';
-import { risolviFastidio, salvaBackup } from '../azioni.js';
+import { risolviFastidio, salvaBackup, applicaTema } from '../azioni.js';
+import { attivaDemo, disattivaDemo } from '../demo.js';
 import { fmtVoce, testoMotivo } from './piano.js';
 
 let comunque = '';
@@ -40,7 +41,9 @@ registra('oggi', () => {
     return { nav: true, html: `<main class="pagina">${testa(null)}
       <div class="card grande ar col"><span class="pill scura" style="align-self:flex-start">${t('oggi.primoPasso')}</span><div class="titolone" style="font-size:34px">${t(haTest ? 'oggi.mancaPiano' : 'oggi.mancaTest')}</div>
         <p style="font-weight:600">${t(haTest ? 'oggi.mancaPianoTesto' : 'oggi.mancaTestTesto')}</p>
-        <a class="btn nero" style="align-self:flex-start" href="#/${haTest ? 'piano/nuovo' : 'test/iniziale'}">${icoPlay()}${t(haTest ? 'oggi.vediPiano' : 'oggi.faiTest')}</a></div></main>` };
+        <a class="btn nero" style="align-self:flex-start" href="#/${haTest ? 'piano/nuovo' : 'test/iniziale'}">${icoPlay()}${t(haTest ? 'oggi.vediPiano' : 'oggi.faiTest')}</a></div>
+      ${haTest ? '' : avviso('occhio', t('oggi.giroTitolo'), t('oggi.giroTesto'), `<button class="btn piccolo" data-a="demo">${t('oggi.giroBottone')}</button>`)}</main>`,
+      azioni: { demo: async () => { await attivaDemo(); applicaTema(); toast(t('demo.accesa')); disegna(false); } } };
   }
   const ctx = contesto(), pr = prossimo(piano, S.sessioni, d), c = circuitoSessione(piano, pr.idx, ctx, S.sessioni, d);
   const serie = serieGiorni(S.sessioni, piano.giorniSett.length, d), lun = lunedi(d);
@@ -50,6 +53,7 @@ registra('oggi', () => {
 
   // Avvisi
   const avvisi = [];
+  if (S.stato.demo) avvisi.push(avviso('occhio', t('demo.oggiTitolo'), t(S.stato.demoSenzaTest ? 'demo.oggiSenzaTest' : 'demo.oggi'), `<button class="btn primario piccolo" data-a="esciDemo">${t(S.stato.demoSenzaTest ? 'demo.esciTest' : 'demo.esci')}</button>`));
   if (!S.salvabile) avvisi.push(avviso('attenzione', t('oggi.nonSalva'), t('oggi.nonSalvaTesto')));
   for (const id of S.esercizi.daDecidere) avvisi.push(avviso('attenzione', t('oggi.fastidio', { nome: nomeEsercizio(id) }), t('oggi.fastidioTesto'), `<button class="btn primario piccolo" data-a="decidi" data-v="${id}">${t('oggi.fastidioScegli')}</button>`));
   const sugg = suggerimentoAttivo();
@@ -90,6 +94,7 @@ registra('oggi', () => {
       <div class="col stretti">${c.esercizi.map(riga).join('')}</div>${cartaSfida}</main>`,
     azioni: {
       comunque: () => { comunque = d + '#' + S.sessioni.length; disegna(); },
+      esciDemo: async () => { const senzaTest = S.stato.demoSenzaTest; await disattivaDemo(); applicaTema(); toast(t('demo.spenta')); if (senzaTest) vai('test/iniziale'); else disegna(false); },
       backup: async () => { if (await salvaBackup()) disegna(); },
       backupDopo: async () => { S.stato.backupRimandato = d; await salva('stato'); disegna(); },
       decidi: el => {

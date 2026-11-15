@@ -84,7 +84,8 @@ registra('test', ([tipo = 'mensile']) => {
       <div class="col">${PROVE.map((x, i) => `<div class="riga"><span class="tondo">${i + 1}</span><span class="cresce" style="font-weight:600">${t('prove.' + x.id + '.nome')}</span><span class="pill">${t('prove.' + x.id + '.misura')}</span></div>`).join('')}
         ${T.conTrazioni ? `<div class="riga"><span class="tondo">+</span><span class="cresce" style="font-weight:600">${t('prove.trazioni.nome')}</span><span class="pill">${t('comune.facoltativa')}</span></div>` : ''}</div>
       <div class="card avviso"><span class="tondo">${ico('scudo')}</span><p class="pic">${t('test.introAvviso')}</p></div>
-      <div class="spazio"></div><button class="btn primario largo" data-a="inizia">${t('test.inizia')}</button>`;
+      <div class="spazio"></div><button class="btn primario largo" data-a="inizia">${t('test.inizia')}</button>
+      ${tipo === 'iniziale' && !ultimoTest() ? `<button class="btn testo largo" data-a="dopo">${t('test.dopo')}</button>` : ''}`;
   } else if (T.fase === 'recupero') {
     html = `${testa(t('test.recupero'))}
       <div class="spazio"></div><div class="centro"><p class="sec forte">${t('test.recuperoTesto')}</p><div class="tempo" id="t-tempo">${mmss(RECUPERO_SEC)}</div></div>
@@ -118,6 +119,7 @@ registra('test', ([tipo = 'mensile']) => {
     azioni: {
       esci: async () => { if (await conferma(t('test.esciTitolo'), t('test.esciTesto'), t('test.esciOk'), t('comune.continua'))) { ferma(); schermoAcceso(false); T = null; vai('oggi'); } },
       inizia: () => { sbloccaAudio(); schermoAcceso(true); passa('pronto'); },
+      dopo: () => { T = null; vai('oggi'); },   // si può guardare l'app prima del test: per allenarsi resta obbligatorio
       fac: () => { const id = provaCorrente().id; T.fac[id] = !T.fac[id]; disegna(); },
       via: () => { sbloccaAudio(); T.conta = 0; passa('conto'); },
       piu: () => { T.conta++; vibra(20); const el = document.getElementById('t-conta'); if (el) el.textContent = T.conta; },

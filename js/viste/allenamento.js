@@ -237,7 +237,7 @@ function vistaRiepilogo() {
 }
 
 registra('allenamento', ([cosa = 'giorno']) => {
-  if (cosa === 'giorno' && !S.piano) return { html: '', dopo: () => vai('oggi', true) };
+  if (!S.test.length || (cosa === 'giorno' && !S.piano)) return { html: '', dopo: () => vai('oggi', true) };   // prima il test iniziale
   if (!A && S.attivo && S.attivo.cosa === cosa) { A = copia(S.attivo); if (A.fase === 'amrap') { schermoAcceso(true); avviaTic(); } }
   if (!A || A.cosa !== cosa) crea(cosa);
   if (A.fase === 'amrap' && !tic) { schermoAcceso(true); avviaTic(); }

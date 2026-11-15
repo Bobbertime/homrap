@@ -23,7 +23,7 @@ export async function attivaDemo() {
   });
   const mensili = AMICI.map((a, i) => amico(a, i, 'm')), settimanali = AMICI.map((a, i) => amico(a, i, 'w'));
   await importa({
-    kv: { ...reale.kv, profilo: reale.kv.profilo || PROFILO, piano: null, stato: { ...reale.kv.stato, onboarding: true, demo: true }, backup: { ultimo: Date.now(), daRicordare: false },
+    kv: { ...reale.kv, profilo: reale.kv.profilo || PROFILO, piano: null, stato: { ...reale.kv.stato, onboarding: true, demo: true, demoSenzaTest: !reale.test.length }, backup: { ultimo: Date.now(), daRicordare: false },
       esercizi: { scartati: [], daDecidere: [], sostituzioni: {}, tempi: {} },
       misure: [42, 21, 1].map((g, i) => ({ data: piuGiorni(d, -g), peso: 74 - i * 0.8, vita: 86 - i })),
       classifica: { periodo: 'm', gruppo: { v: 1, p: { t: 'm', k: chiavePeriodo('m', d) }, ts: 0, m: mensili }, codici: Object.fromEntries(settimanali.map(m => [m.id, m])),

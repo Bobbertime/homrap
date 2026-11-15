@@ -30,10 +30,10 @@ Il file vuoto `.nojekyll` dice a GitHub di pubblicare i file così come sono: la
 Dopo ogni modifica ai file, apri `sw.js` e cambia la riga
 
 ```js
-const VERSIONE = 'homrap-1.0.1';
+const VERSIONE = 'homrap-1.0.2';
 ```
 
-per esempio in `homrap-1.0.2`. Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
+per esempio in `homrap-1.0.3`. Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
 
 ### Provarla sul computer
 
@@ -184,6 +184,7 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - Nel Profilo c'è l'interruttore "Evita i salti", per chi ha vicini al piano di sotto.
 - Un esercizio con stress 2 o 3 su una zona infortunata viene escluso; con stress 1 resta. Le zone "da sforzare meno" abbassano solo il punteggio.
 - Il rematore inverso sotto il tavolo è proposto con un avviso di sicurezza ben visibile.
+- Il test iniziale si può rimandare: nella schermata del test c'è "Lo faccio dopo: prima guardo l'app". Senza test si possono vedere tutte le schede e, con "Guarda l'app con dati di esempio", girare l'app piena (allenamento compreso) in modalità demo. Per allenarsi davvero il test resta obbligatorio: senza test non partono né l'allenamento del giorno né la sfida del mese, e la scheda Oggi lo propone come primo passo.
 - Nel giorno di riposo c'è il pulsante "Allenati comunque oggi".
 - I tipi di giorno ruotano (A, B, C…) in ordine: se salti un allenamento, la volta dopo riparti da quello saltato.
 - La serie di giorni conta gli allenamenti fatti senza saltare una settimana di piano; la settimana in corso non la interrompe.

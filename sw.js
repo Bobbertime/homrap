@@ -1,6 +1,6 @@
 // Service worker: mette in cache l'app al primo avvio, così dopo funziona offline.
 // IMPORTANTE: a ogni modifica dei file cambia VERSIONE, altrimenti i telefoni continuano a usare la copia vecchia.
-const VERSIONE = 'homrap-1.0.1';
+const VERSIONE = 'homrap-1.0.2';
 const CACHE_FONT = 'homrap-font-1';
 const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
 const FILE = [
