@@ -159,12 +159,43 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 
 /* Grafici e classifica */
 .barre { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
-.barre > div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; font-family: var(--fn); font-weight: 700; font-size: 15px; color: var(--txt2); }
+.barre > div, .barre > button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; font-family: var(--fn); font-weight: 700; font-size: 15px; color: var(--txt2); }
 .barre i { width: 100%; border-radius: 10px 10px 4px 4px; background: var(--sup2); min-height: 6px; }
 .barre .ult { color: var(--txt); }
 .barre .ult i { background: var(--ar); }
 .barre .leg i { background: none; border: 2px solid var(--sup2); }
 .barre .leg.ult i { border-color: var(--ar); }
+.barre > button { min-width: 0; padding: 0; text-align: center; touch-action: manipulation; }
+.barre > button:active i { opacity: .7; }
+/* Report: tempo di ogni giro, curva del battito, zone di sforzo */
+.grafico { width: 100%; height: auto; display: block; }
+.grafico .gl { fill: none; stroke: var(--ar); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.grafico .gg { stroke: var(--lin); stroke-width: 1; stroke-dasharray: 2 4; }
+.grafico .ga { stroke: var(--lin); stroke-width: 1; }
+.grafico .gt { stroke: var(--txt2); stroke-width: 1.500; stroke-linecap: round; }
+.grafico .gp { fill: var(--ar); stroke: var(--sup); stroke-width: 2; }
+.grafico text { font-family: var(--f); font-size: 10px; font-weight: 600; fill: var(--txt2); }
+.grafico .gz { font-weight: 800; }
+.grafico .gl.tenue { stroke: var(--txt2); stroke-opacity: .55; }
+.grafico .gp.neutro { fill: var(--txt2); }
+.grafico .ge.forte { font-weight: 800; fill: var(--txt); }
+.grafico .gv { font-family: var(--fn); font-size: 14px; font-weight: 700; fill: var(--txt); }
+.zone { display: flex; flex-direction: column; gap: 10px; }
+.zone > div { display: grid; grid-template-columns: 96px minmax(0, 1fr) 54px; gap: 10px; align-items: center; }
+.zone .nome { font-size: 13px; font-weight: 700; line-height: 1.2; }
+.zone .nome .num { font-size: 16px; }
+.zone small { display: block; font-size: 11px; font-weight: 600; color: var(--txt2); }
+.zone .pista { display: block; height: 14px; background: var(--sup2); }
+.zone .pista b { height: 14px; background: var(--ar); min-width: 0; }
+.zone .z1 .pista b { opacity: .28; }
+.zone .z2 .pista b { opacity: .44; }
+.zone .z3 .pista b { opacity: .62; }
+.zone .z4 .pista b { opacity: .8; }
+.zone .val { text-align: right; line-height: 1.15; }
+.zone .val .num { font-size: 18px; }
+.tab th { padding: 0 0 6px; font-size: 11px; font-weight: 700; color: var(--txt2); text-align: right; white-space: nowrap; }
+.tab.conf td:first-child { color: var(--txt2); }
+.tab.conf td.num { font-size: 17px; min-width: 52px; }
 .livello { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
 .livello i { height: 8px; border-radius: 999px; background: var(--sup2); overflow: hidden; display: block; }
 .livello i b { display: block; height: 100%; background: var(--ar); border-radius: 999px; }
@@ -178,7 +209,8 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .avatar { border-radius: 999px; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; color: #141414; }
 .spento { opacity: .5; }
 .calendario { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; text-align: center; font-size: 12px; font-weight: 600; color: var(--txt2); }
-.calendario span { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 999px; }
+.calendario span, .calendario button { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 999px; }
+.calendario button { width: 100%; font-size: 12px; text-align: center; touch-action: manipulation; }
 .calendario .f { background: var(--ars); color: var(--art); font-weight: 800; }
 .calendario .o { outline: 2px solid var(--ar); outline-offset: -2px; color: var(--txt); }
 .tab { width: 100%; border-collapse: collapse; }

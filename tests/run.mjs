@@ -11,7 +11,9 @@ import { ATTREZZI } from '../data/attrezzi.js';
 import { PROVE } from '../data/soglie-test.js';
 import { IT } from '../i18n/it.js';
 import { t } from '../js/i18n.js';
-import { piuGiorni, settimanaISO, lunedi } from '../js/util.js';
+import { piuGiorni, settimanaISO, lunedi, linkVideo, eYouTube } from '../js/util.js';
+import * as A from '../js/analisi.js';
+import { passoNav } from '../js/router.js';
 
 const radice = join(dirname(fileURLToPath(import.meta.url)), '..');
 let ok = 0, ko = 0;
@@ -133,6 +135,116 @@ prova('rotazione dei tipi di giorno e giorno di riposo', () => {
 prova('serie di giorni: la settimana in corso non la interrompe', () => {
   const p = pianoP(), gg = [-14, -12, -10, -7, -5, -3, 0].map(n => sessione(p, 0, ctxP, piuGiorni(OGGI, n)));
   uguale(L.serieGiorni(gg, 3, OGGI), 7); uguale(L.serieGiorni(gg.slice(0, 3).concat(gg.slice(5)), 3, OGGI), 1); });
+// Battito nella progressione: c'è solo se la sessione ha il battito medio e il contesto ha il massimo (ctx.bpmMax).
+const ctxB = ctxBase({ bpmMax: 180 }), bpm = n => ({ orologio: { bpmMedio: n } });
+const dueSessioni = (extraA = {}, extraB = {}, piu = 0) => { const p = pianoP(), a = sessione(p, 0, ctxB, '2026-11-16', extraA), b = sessione(p, 0, ctxB, '2026-11-23', extraB); a.giri += piu; b.giri += piu; return { p, a, b }; };
+prova('battito molto alto (dal 90% del massimo): niente aumento anche se i giri ci sono', () => {
+  const { p, a, b } = dueSessioni(bpm(150), bpm(163), 1), prima = JSON.stringify(p);       // 163 / 180 = 91%
+  const s = L.valutaProgressione(p, 0, [a, b], ctxB);
+  uguale([s.tipo, s.motivo, s.modifiche.length, s.battito], ['mantieni', 'battitoAlto', 0, 91]);
+  L.applicaModifiche(p, s); uguale(JSON.stringify(p), prima, 'mantieni non deve cambiare il piano');
+  uguale(L.valutaProgressione(p, 0, [a, { ...b, ...bpm(161) }], ctxB).tipo, 'aumenta');           // 89%: sotto la soglia
+  uguale(L.valutaProgressione(p, 0, [{ ...a, ...bpm(170) }, { ...b, ...bpm(150) }], ctxB).tipo, 'aumenta'); });   // conta solo l'ultima sessione
+prova('battito alto ma senza massimo noto o senza battito: la regola dei giri resta com\'era', () => {
+  const { p, a, b } = dueSessioni(bpm(170), bpm(170), 1);
+  uguale(L.valutaProgressione(p, 0, [a, b], ctxP).tipo, 'aumenta'); uguale(L.quotaBattito(b, ctxP), null); uguale(L.quotaBattito({ orologio: null }, ctxB), null); uguale(L.quotaBattito({ orologio: { bpmMedio: 0 } }, ctxB), null); });
+prova('obiettivo raggiunto 2 volte con fatica bassa e battito basso: propone di aumentare senza il giro in più', () => {
+  const { p, a, b } = dueSessioni({ ...bpm(130), fatica: 4 }, { ...bpm(135), fatica: 5 });           // 72% e 75%, giri = obiettivo
+  const s = L.valutaProgressione(p, 0, [a, b], ctxB);
+  uguale([s.tipo, s.motivo, s.battito], ['aumenta', 'facile', 75]); vero(s.modifiche.length >= 1); for (const m of s.modifiche) vero(m.a !== m.da || m.q1 > m.q0); });
+prova('la regola del battito basso non scatta se manca una delle condizioni', () => {
+  const caso = (xa, xb, ctx = ctxB) => { const { p, a, b } = dueSessioni(xa, xb); return L.valutaProgressione(p, 0, [a, b], ctx); };
+  const ok = { ...bpm(130), fatica: 4 };
+  uguale(caso(ok, { ...bpm(136), fatica: 4 }), null, 'battito 76%');
+  uguale(caso(ok, { ...bpm(130), fatica: 6 }), null, 'fatica 6');
+  uguale(caso(ok, { fatica: 4 }), null, 'una sessione senza battito');
+  uguale(caso({ fatica: 4 }, ok), null, 'la prima senza battito');
+  uguale(caso(ok, ok, ctxP), null, 'massimo sconosciuto');
+  uguale(caso(ok, { ...ok, giri: 1, obiettivo: 6, extra: 0 }), null, 'obiettivo non raggiunto');
+  const { p, a } = dueSessioni(ok, ok); uguale(L.valutaProgressione(p, 0, [a], ctxB), null, 'una sola sessione'); });
+prova('fatica 9 vince sempre: si alleggerisce anche con battito basso', () => { const { p, a, b } = dueSessioni({ ...bpm(120), fatica: 4 }, { ...bpm(120), fatica: 9 }); uguale(L.valutaProgressione(p, 0, [a, b], ctxB).tipo, 'alleggerisci'); });
+prova('senza battito la progressione è identica a prima', () => {
+  const { p, a, b } = dueSessioni({ fatica: 3 }, { fatica: 3 }); uguale(L.valutaProgressione(p, 0, [a, b], ctxB), null);
+  const d = dueSessioni({}, {}, 1); const s = L.valutaProgressione(d.p, 0, [d.a, d.b], ctxB); uguale([s.tipo, s.motivo, 'battito' in s], ['aumenta', 'sopra', false]); });
+
+gruppo('Analisi della sessione (report)');
+const curvaPiatta = (bpmDi, n = 121, passo = 10) => Array.from({ length: n }, (_, i) => [i * passo, bpmDi(i * passo)]);
+const sRep = (extra = {}) => ({ id: 'r' + (++nS), ts: Date.parse('2026-11-16') + nS, data: '2026-11-16', tipo: 'amrap', tipoGiorno: 'A', rev: 0, fattore: 1, durata: 20, esercizi: [{ id: 'squat', q: 15 }], obiettivo: 6, ripGiro: 40, giri: 6, extra: 0, fatica: 7, tempiGiro: [180, 182, 184, 186, 188, 190], ...extra });
+prova('battito massimo: profilo, poi età (208 − 0,7 × età), poi il più alto registrato se maggiore', () => {
+  uguale(A.stimaBpmMax(40), 180); uguale(A.stimaBpmMax(35), 184); uguale(A.stimaBpmMax(0), null);
+  uguale(A.bpmMassimo({ eta: 40 }, []), { valore: 180, fonte: 'eta' });
+  uguale(A.bpmMassimo({ eta: 40, bpmMax: 192 }, [{ orologio: { bpmMax: 199 } }]), { valore: 192, fonte: 'profilo' });
+  uguale(A.bpmMassimo({ eta: 40 }, [{ orologio: { bpmMax: 176 } }, { orologio: null }]), { valore: 180, fonte: 'eta' });
+  uguale(A.bpmMassimo({ eta: 40 }, [{ orologio: { bpmMax: 176, curva: [[0, 120], [10, 187]] } }]), { valore: 187, fonte: 'registrato' });
+  uguale(A.bpmMassimo({ eta: 40 }, [{ orologio: { bpmMax: 255 } }]), { valore: 180, fonte: 'eta' }, 'valore impossibile ignorato');
+  uguale(A.bpmMassimo({ eta: 40, bpmMax: 40 }, []).fonte, 'eta', 'valore del profilo fuori scala ignorato'); uguale(A.bpmMassimo({}, []), { valore: null, fonte: null }); });
+prova('zone: confini al 60, 70, 80 e 90% del massimo', () => { uguale([107, 108, 126, 143, 144, 161, 162, 200].map(b => A.zonaDi(b, 180)), [1, 2, 3, 3, 4, 4, 5, 5]); });
+prova('tempo nelle zone: i secondi tornano e i buchi lunghi non contano', () => {
+  const z = A.tempoInZone(curvaPiatta(s => (s < 600 ? 130 : 165)), 180);     // 10 minuti in Z3, poi Z5
+  uguale(z.tot, 1200); uguale(z.sec[0] + z.sec[1], 0); uguale(z.sec[2], 590); uguale(z.sec[3], 10, 'il tratto di passaggio'); uguale(z.sec[4], 600);
+  vero(Math.abs(z.quota.reduce((a, b) => a + b, 0) - 1) < 1e-9);
+  const conBuco = A.tempoInZone([[0, 130], [10, 130], [20, 130], [320, 130], [330, 130]], 180); uguale(conBuco.tot, 30);
+  uguale(A.tempoInZone([[0, 130]], 180), null); uguale(A.tempoInZone(curvaPiatta(() => 130), null), null); });
+prova('giri: media, più veloce, più lento e calo tra primo e ultimo terzo', () => {
+  const g = A.analisiGiri([160, 165, 170, 175, 190, 200]);
+  uguale([g.n, g.iMin, g.iMax, g.primi, g.ultimi], [6, 0, 5, 162.5, 195]); uguale(Math.round(g.calo * 100), 20); uguale(g.andamento, 'caloForte');
+  uguale(A.analisiGiri([180, 181, 182, 198]).andamento, 'caloLieve'); uguale(A.analisiGiri([200, 190, 185, 180]).andamento, 'crescendo'); uguale(A.analisiGiri([180, 183, 179, 182]).andamento, 'costante');
+  uguale(A.analisiGiri([180]).calo, null); uguale(A.analisiGiri([]), null); uguale(A.analisiGiri([0, 180, 190]).n, 2, 'i tempi a zero si scartano'); });
+prova('tempi dei giri: quelli dell\'app; senza, i lap dell\'orologio meno l\'ultimo', () => {
+  uguale(A.tempiGiriDi(sRep()).fonte, 'app');
+  uguale(A.tempiGiriDi(sRep({ tempiGiro: [], orologio: { giri: [{ durata: 170 }, { durata: 180 }, { durata: 45 }] } })), { tempi: [170, 180], fonte: 'orologio' });
+  uguale(A.tempiGiriDi(sRep({ tempiGiro: [], orologio: { bpmMedio: 140 } })), { tempi: [], fonte: null }); });
+prova('battito medio per giro, allineato con l\'ora di inizio dell\'app', () => {
+  const inizio = Date.parse('2026-11-16T18:00:00Z'), curva = curvaPiatta(s => (s < 160 ? 100 : s < 260 ? 130 : 150), 60);
+  const r = A.bpmPerGiro(sRep({ inizio: inizio + 60e3, orologio: { inizio, curva } }), [100, 100, 100], 'app');    // l'orologio è partito un minuto prima
+  uguale(r.confini, [60, 160, 260, 360]); uguale(r.bpm, [100, 130, 150]);
+  uguale(A.bpmPerGiro(sRep({ orologio: { bpmMedio: 140 } }), [100, 100], 'app'), null); });
+prova('sessione precedente: stesso tipo di giorno, prima di questa, non interrotta', () => {
+  const a = sRep({ id: 'a', ts: 1 }), b = sRep({ id: 'b', ts: 2, tipoGiorno: 'B' }), c = sRep({ id: 'c', ts: 3, interrotta: true }), d = sRep({ id: 'd', ts: 4 }), e = sRep({ id: 'e', ts: 5 });
+  uguale(A.precedente(d, [a, b, c, d, e]).id, 'a'); uguale(A.precedente(a, [a, b, c, d, e]), null); uguale(A.precedente(e, [e, d, c, b, a]).id, 'd'); });
+prova('confronto: giri, media giro, battito, fatica e circuito cambiato', () => {
+  const prima = sRep({ ts: 1, data: '2026-11-09', giri: 5, extra: 20, fatica: 8, tempiGiro: [], orologio: { bpmMedio: 152 } }), ora = sRep({ ts: 2, giri: 6, extra: 10, orologio: { bpmMedio: 147 } });
+  const c = A.confronta(ora, prima, 180);
+  uguale([c.giri.prima, c.giri.ora, c.giri.diff, c.bpm.diff, c.fatica.diff, c.circuitoDiverso, c.data], [5.5, 6.25, 0.75, -5, -1, false, '2026-11-09']);
+  uguale([c.mediaGiro.ora, Math.round(c.mediaGiro.prima)], [185, 218], 'media dei giri cronometrati; senza tempi, durata diviso giri'); uguale(A.mediaGiroDi(sRep({ tempiGiro: [], interrotta: true })), null);
+  vero(A.confronta(ora, { ...prima, esercizi: [{ id: 'squat', q: 17 }] }, 180).circuitoDiverso); uguale(A.confronta(ora, null, 180), null);
+  uguale(A.confronta(ora, { ...prima, orologio: null }, 180).bpm, null); });
+prova('lettura senza orologio: 2-3 frasi dai tempi dei giri dell\'app', () => {
+  const a = A.analizza(sRep({ tempiGiro: [160, 165, 170, 175, 190, 200] }), [], { eta: 40 });
+  uguale(a.cuore, null); uguale(a.frasi.map(f => f.k), ['caloForte', 'primaVolta', 'inObiettivo']); uguale(a.frasi[0].par.pct, 20);
+  const senza = A.analizza(sRep({ tempiGiro: [], giri: 7, extra: 20 }), [], { eta: 40 }); uguale(senza.giri, null); uguale(senza.frasi.map(f => f.k), ['primaVolta', 'sopraObiettivo']); });
+prova('lettura con orologio: ritmo, battito e confronto', () => {
+  const prima = sRep({ id: 'p', ts: 1, data: '2026-11-09', giri: 5, extra: 20, orologio: { bpmMedio: 152 } });
+  const ora = sRep({ id: 'o', ts: 2, giri: 6, extra: 10, orologio: { curva: curvaPiatta(() => 147), calorie: 210 } });
+  const a = A.analizza(ora, [prima, ora], { eta: 40 });
+  uguale([a.cuore.medio, a.cuore.picco, a.cuore.zonaMedia, a.max.valore], [147, 147, 4, 180]); uguale(a.cuore.zone.sec, [0, 0, 0, 1200, 0]);
+  uguale(a.frasi.map(f => f.k), ['costante', 'cuoreAlto', 'meglioMenoBattito']); uguale(a.frasi[2].par, { data: '2026-11-09', giri: 0.8, bpm: 5 }); });
+prova('lettura: zona 5 per un quarto del tempo, battito al limite, deriva a ritmo costante', () => {
+  const con = curva => A.analizza(sRep({ orologio: { curva } }), [], { eta: 40 }).frasi.map(f => f.k)[1];
+  uguale(con(curvaPiatta(s => (s < 800 ? 150 : 170))), 'zonaRossa'); uguale(con(curvaPiatta(() => 163)), 'zonaRossa');
+  uguale(con(curvaPiatta(s => (s < 600 ? 135 : 150))), 'deriva'); uguale(con(curvaPiatta(() => 135)), 'cuoreMedio'); uguale(con(curvaPiatta(() => 120)), 'cuoreBasso');
+  uguale(A.analizza(sRep({ orologio: { bpmMedio: 164 } }), [], { eta: 40 }).frasi.map(f => f.k)[1], 'cuoreMoltoAlto', 'solo la media, senza curva'); });
+prova('lettura: sempre 2 o 3 frasi, ognuna con il suo testo', () => {
+  const casi = [sRep(), sRep({ tempiGiro: [] }), sRep({ interrotta: true }), sRep({ fatica: 9, orologio: { bpmMedio: 120 } }), sRep({ fatica: 4, orologio: { bpmMedio: 165 } }), sRep({ tempiGiro: [200], obiettivo: 0 })];
+  for (const s of casi) { const f = A.analizza(s, [], { eta: 40 }).frasi; vero(f.length >= (s.obiettivo ? 2 : 1) && f.length <= 3, JSON.stringify(f)); for (const x of f) vero(IT.rep.frase[x.k], 'manca il testo di ' + x.k); uguale(new Set(f.map(x => x.k)).size, f.length); }
+  for (const k of ['interrotta', 'caloForte', 'caloLieve', 'crescendo', 'costante', 'zonaRossa', 'cuoreMoltoAlto', 'cuoreAlto', 'cuoreMedio', 'cuoreBasso', 'deriva', 'circuitoCambiato', 'meglioMenoBattito', 'piuGiri', 'menoGiri', 'stessoMenoBattito', 'stessoPiuBattito', 'stabile', 'primaVolta', 'faticaSenzaBattito', 'battitoSenzaFatica', 'sopraObiettivo', 'sottoObiettivo', 'inObiettivo']) vero(IT.rep.frase[k], k); });
+
+gruppo('Navigazione e video');
+prova('tornando indietro si ripristina lo scorrimento, andando avanti si parte dall\'alto', () => {
+  let n = { idx: 0, pila: ['#/profilo'], scorri: [] }, r;
+  r = passoNav(n, { hash: '#/libreria', voce: null, y: 640 }); n = r.stato; uguale([n.idx, r.ripristina, r.nuova], [1, null, true]);
+  r = passoNav(n, { hash: '#/esercizio/squat', voce: null, y: 900 }); n = r.stato; uguale([n.idx, r.ripristina], [2, null]);
+  r = passoNav(n, { hash: '#/libreria', voce: 1, y: 300 }); n = r.stato; uguale([n.idx, r.ripristina, r.nuova], [1, 900, false]);
+  r = passoNav(n, { hash: '#/profilo', voce: 0, y: 900 }); n = r.stato; uguale([n.idx, r.ripristina], [0, 640]);
+  r = passoNav(n, { hash: '#/libreria', voce: 1, y: 640 }); n = r.stato; uguale([n.idx, r.ripristina], [1, null], 'avanti: dall\'alto');
+  r = passoNav(n, { hash: '#/comprare', voce: null, y: 50 }); n = r.stato; uguale([n.idx, n.pila], [2, ['#/profilo', '#/libreria', '#/comprare']], 'una pagina nuova cancella le voci in avanti');
+  r = passoNav(n, { hash: '#/oggi', voce: null, sostituzione: true, y: 10 }); n = r.stato; uguale([n.idx, n.pila, r.ripristina], [2, ['#/profilo', '#/libreria', '#/oggi'], null], 'una sostituzione non aggiunge voci'); });
+prova('video: link scelto a mano se è di YouTube, altrimenti ricerca con il nome in italiano', () => {
+  uguale(linkVideo(undefined, 'Piegamenti al muro', 'esecuzione corretta'), { url: 'https://www.youtube.com/results?search_query=Piegamenti%20al%20muro%20esecuzione%20corretta', ricerca: true });
+  uguale(linkVideo('https://youtu.be/abc123', 'Squat', 'x'), { url: 'https://youtu.be/abc123', ricerca: false }); uguale(linkVideo('https://esempio.it/video', 'Squat', 'x').ricerca, true);
+  vero(eYouTube('https://www.youtube.com/watch?v=abc') && eYouTube('https://m.youtube.com/shorts/abc') && !eYouTube('http://youtu.be/abc') && !eYouTube('https://youtube.com.finto.it/watch?v=1') && !eYouTube('testo'));
+  uguale(t('esercizio.videoRicerca'), 'esecuzione corretta'); for (const e of ESERCIZI) vero(e.video === undefined || eYouTube(e.video), e.id + ': il campo video deve essere un link https di YouTube'); });
+
 
 gruppo('Codici personali e di gruppo');
 const pianoC = pianoP(), sess = [sessione(pianoC, 0, ctxP, '2026-11-02'), sessione(pianoC, 1, ctxP, '2026-11-04'), { ...sessione(pianoC, 0, ctxP, '2026-11-05'), tipo: 'sfida', meseSfida: '2026-11', variante: 'completa', giri: 8, extra: 11, ripGiro: 50 }];
@@ -151,6 +263,13 @@ await prova('un codice modificato (CRC errato) viene rifiutato', async () => {
   let e2 = null; try { await C.leggiCodice('HOMRAP1.abc'); } catch (e) { e2 = e.message; } uguale(e2, 'formato'); });
 prova('senza "Includi dettagli": solo sfida, sessioni e serie', () => { uguale(Object.keys(mio(false)).sort(), ['c', 'id', 'in', 'n', 'p', 'se', 'sf', 'st', 'ts', 'v']); });
 prova('nei codici non entrano mai età, peso, misure, zone o sicurezza', () => { const s = JSON.stringify(mio(true)); for (const k of ['eta', 'peso', 'altezza', 'misure', 'infortuni', 'zone', 'sicurezza', 'sesso']) vero(!s.includes('"' + k + '"'), k); });
+await prova('battito ed età non entrano mai nei codici, nemmeno con i dati dell\'orologio', async () => {
+  const conOrologio = sess.map((s, i) => ({ ...s, orologio: { inizio: 1, durata: 1200, bpmMedio: 151 + i, bpmMax: 177 + i, calorie: 333, curva: [[0, 101], [10, 177 + i]], giri: [{ durata: 173 }] } }));
+  for (const dettagli of [true, false]) for (const tipo of ['m', 'w']) {
+    const d = C.datiPersonali({ io: { id: 'abc123', nome: 'Roby M', colore: 2 }, sessioni: conOrologio, test: testC, perSettimana: 3, profilo: { eta: 47, bpmMax: 189 } }, { tipo, dettagli }, '2026-11-16', 1e12), s = JSON.stringify(d);
+    for (const k of ['orologio', 'bpm', 'bpmMedio', 'bpmMax', 'curva', 'calorie', 'eta', 'battito', 'fatica']) vero(!s.includes('"' + k + '"'), k);
+    for (const v of [151, 152, 153, 177, 178, 179, 189, 333]) vero(!new RegExp('[^0-9.]' + v + '[^0-9.]').test(s), 'valore ' + v + ' nel codice');
+    uguale((await C.leggiCodice(await C.creaCodice('HOMRAP1', d))).dati, d); } });
 await prova('estrae più codici da un messaggio di WhatsApp', async () => {
   const a = await C.creaCodice('HOMRAP1', mio(false)), b = await C.creaCodice('HOMRAPG1', { m: [] });
   uguale(C.estraiCodici(`[16/11, 18:02] Luca: ecco i miei risultati HoMRAP:\n${a}\n[16/11, 18:05] Sara: il mio ${b} ciao!`), [a, b]); });
@@ -228,7 +347,8 @@ prova('famiglie di chiavi dinamiche complete', () => {
   serve('obiettivi.', L.OBIETTIVI.flatMap(o => [o + '.nome', o + '.desc', o + '.icona'])); serve('aree.', L.AREE); serve('schemi.', SCHEMI); serve('zone.', ZONE); serve('attrezzi.', ATTREZZI.map(a => a.id));
   serve('focus.', Object.keys(L.FOCUS_SCHEMA)); serve('livelli.', [1, 2, 3, 4, 5].flatMap(n => [n + '.nome', n + '.desc'])); serve('onb.', ['chi', 'sicurezza', 'obiettivi', 'esperienza', 'zone', 'disponibilita', 'attrezzatura', 'orologio'].flatMap(p => [p + '.titolo', p + '.sotto']));
   serve('prove.', [...PROVE.map(p => p.id), 'trazioni'].flatMap(p => [p + '.nome', p + '.misura', p + '.regole', p + '.consigli'])); serve('prove.', ['piegamenti.regoleFac', 'piegamenti.facilitata', 'burpees.regoleFac', 'burpees.facilitata']);
-  serve('motivi.', ['facile', 'difficile', 'gentile', 'corpoLibero', 'attrezzo', 'simile']); serve('sugg.', ['aumenta', 'alleggerisci', 'motivo.sopra', 'motivo.sotto', 'motivo.fatica']); serve('oggi.motivo.', ['scarico', 'ripartenza']);
+  serve('motivi.', ['facile', 'difficile', 'gentile', 'corpoLibero', 'attrezzo', 'simile']); serve('sugg.', ['aumenta', 'alleggerisci', 'mantieni', 'motivo.sopra', 'motivo.sotto', 'motivo.fatica', 'motivo.battitoAlto', 'motivo.facile']);
+  serve('rep.', ['zona.1', 'zona.2', 'zona.3', 'zona.4', 'zona.5', 'maxFonte.profilo', 'maxFonte.eta', 'maxFonte.registrato', 'fonteApp', 'fonteOrologio', 'righe.giri', 'righe.mediaGiro', 'righe.calo', 'righe.bpm', 'righe.fatica']); serve('oggi.motivo.', ['scarico', 'ripartenza']);
   serve('installa.', ['fatta.testo', 'ios.testo', 'ios.passi', 'android.testo', 'android.passi', 'altro.testo', 'altro.passi']); serve('all.', ['riscaldamento', 'defaticamento', 'respiro', 'completa', 'facilitata', 'modo.app', 'modo.orologio']);
   serve('cla.', ['quale.sfida', 'quale.miglioramento', 'quale.costanza', 'desc.miglioramento', 'desc.costanza', 'mom.migliorato', 'mom.costante', 'mom.record', 'mom.serie', 'completa', 'facilitata']);
   serve('conf.frase.', ['lui', 'tu'].flatMap(c => ['sessioni', 'prova', 'giro', 'serie', 'miglioramento'].map(k => c + '.' + k))); serve('compra.', ['motivo.obiettivo', 'motivo.varieta', 'motivo.massimo', 'motivo.trazione', 'fascia.1', 'fascia.2', 'fascia.3']);

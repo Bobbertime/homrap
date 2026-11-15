@@ -1,14 +1,14 @@
 // Service worker: mette in cache l'app al primo avvio, così dopo funziona offline.
 // IMPORTANTE: a ogni modifica dei file cambia VERSIONE, altrimenti i telefoni continuano a usare la copia vecchia.
-const VERSIONE = 'homrap-1.0.2';
+const VERSIONE = 'homrap-1.0.3';
 const CACHE_FONT = 'homrap-font-1';
 const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
 const FILE = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/router.js', './js/ui.js', './js/util.js', './js/db.js', './js/stato.js', './js/i18n.js', './js/audio.js',
-  './js/logica.js', './js/classifica.js', './js/orologi.js', './js/backup.js', './js/azioni.js', './js/piattaforma.js', './js/immagini.js', './js/demo.js',
+  './js/logica.js', './js/analisi.js', './js/classifica.js', './js/orologi.js', './js/backup.js', './js/azioni.js', './js/piattaforma.js', './js/immagini.js', './js/demo.js',
   './js/viste/onboarding.js', './js/viste/test.js', './js/viste/piano.js', './js/viste/oggi.js', './js/viste/allenamento.js',
-  './js/viste/progressi.js', './js/viste/classifica.js', './js/viste/profilo.js',
+  './js/viste/progressi.js', './js/viste/report.js', './js/viste/classifica.js', './js/viste/profilo.js',
   './data/esercizi.js', './data/attrezzi.js', './data/soglie-test.js', './i18n/it.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-192.png', './icons/maskable-512.png', './icons/apple-touch-icon.png',
 ];

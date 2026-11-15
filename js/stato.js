@@ -3,6 +3,7 @@ import * as db from './db.js';
 import { SCHEMA, migra, creaBackup } from './backup.js';
 import { uid, isoData, copia } from './util.js';
 import { valutaTest, GIORNI_PREDEFINITI, AREE } from './logica.js';
+import { bpmMassimo } from './analisi.js';
 
 const PREDEFINITI = () => ({
   profilo: null,           // risposte dell'onboarding
@@ -80,6 +81,8 @@ export function contesto(extra = {}) {
     cap: v ? v.cap : { squat: 20, piegamenti: 8, burpees: 8, plank: 40, superman: 30, trazioni: 0 },
     scartati: S.esercizi.scartati, daDecidere: S.esercizi.daDecidere, sostituzioni: S.esercizi.sostituzioni, tempi: S.esercizi.tempi,
     giorni: p.giorni || 3, giorniSett: p.giorniSett || GIORNI_PREDEFINITI[p.giorni || 3], durata: p.durata || 20,
-    blocco: S.piano ? S.piano.blocco : 1, ...extra,
+    blocco: S.piano ? S.piano.blocco : 1,
+    bpmMax: bpmMassimo(p, S.sessioni).valore,   // serve solo alla progressione: non entra mai nei codici della classifica
+    ...extra,
   };
 }

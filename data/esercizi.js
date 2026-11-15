@@ -19,6 +19,9 @@
 //   fac, dif id della variante più facile e più difficile
 //   peso     { tipo: 'manubri' | 'kettlebell', kg: [kg suggeriti per i livelli 1-5] }
 //   anim     (facoltativo) percorso di un'animazione: se presente viene mostrata nella scheda dell'esercizio
+//   video    (facoltativo) link a un video di YouTube scelto a mano, es. video: 'https://www.youtube.com/watch?v=…'.
+//            Se manca (come adesso per tutti gli esercizi), il pulsante «Guarda un video su YouTube» apre una ricerca
+//            con il nome dell'esercizio in italiano e la frase "esecuzione corretta". Vedi il README.
 export const ESERCIZI = [
   // ── Spinta (riferimento: piegamenti in 60")
   { id: 'piegamenti_muro', schema: 'spinta', liv: 1, att: [], unita: 'rip', rif: 'piegamenti', k: 3.5, min: 8, max: 25, sec: 2, eff: [2, 1, 2, 1, 3, 1], stress: { spalle: 1, polsi: 1 }, musc: ['petto', 'tricipiti'], musc2: ['spalle'], dif: 'piegamenti_inclinati' },

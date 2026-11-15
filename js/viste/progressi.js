@@ -1,9 +1,10 @@
 // Scheda Progressi: record e grafico per tipo di giorno, test mensili, livelli, misure, calendario.
 import { S, salva, oggi, valutazione, testIniziale, ultimoTest } from '../stato.js';
 import { t, tn } from '../i18n.js';
-import { registra, disegna } from '../router.js';
+import { registra, disegna, vai } from '../router.js';
 import { esc, ico, foglio, barre, scintilla, fmtPunti, fmtData, fmtDec, toast } from '../ui.js';
 import { giriEq, serieGiorni, miglioramento, AREE } from '../logica.js';
+import { titoloSessione } from './report.js';
 import { daIso, isoData, meseISO } from '../util.js';
 import { barraLivello, tabellaTest } from './test.js';
 
@@ -15,7 +16,8 @@ function calendario(d) {
   const anno = base.getFullYear(), mese = base.getMonth(), primo = (base.getDay() + 6) % 7, giorni = new Date(anno, mese + 1, 0).getDate();
   const fatti = new Set(S.sessioni.filter(s => s.tipo !== 'test').map(s => s.data));
   const celle = Array.from({ length: primo }, () => '<span></span>');
-  for (let g = 1; g <= giorni; g++) { const iso = isoData(new Date(anno, mese, g, 12)); celle.push(`<span class="${fatti.has(iso) ? 'f' : ''} ${iso === d ? 'o' : ''}">${g}</span>`); }
+  for (let g = 1; g <= giorni; g++) { const iso = isoData(new Date(anno, mese, g, 12));   // i giorni con un allenamento aprono il report
+    celle.push(fatti.has(iso) ? `<button class="f ${iso === d ? 'o' : ''}" data-a="giornoCal" data-v="${iso}" aria-label="${t('rep.apriDel', { data: fmtData(iso, { day: 'numeric', month: 'long' }) })}">${g}</button>` : `<span class="${iso === d ? 'o' : ''}">${g}</span>`); }
   const nel = [...fatti].filter(x => meseISO(x) === meseISO(isoData(base))).length;
   return `<div class="card col"><div class="fila tra"><button class="ico-btn due" data-a="mese" data-v="-1" aria-label="${t('prog.mesePrima')}">${ico('indietro', 18)}</button>
     <div class="centro"><h3 style="text-transform:capitalize">${base.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}</h3><span class="pic sec">${tn('prog.allenamenti', nel)}</span></div>
@@ -62,8 +64,9 @@ registra('progressi', () => {
         <div class="fila base"><span class="gigante art" style="font-size:112px">${rec.giri}</span>${rec.extra ? `<span class="grosso art">+${rec.extra}</span>` : ''}<span class="sec forte">${t('comune.giri')}</span></div>
         <span class="pic sec">${fmtData(rec.data, { day: 'numeric', month: 'long' })} · AMRAP ${rec.durata}'</span></div>` : `<div class="card bordo sec centro">${t('prog.nessunaSessione', { tipo: tipoSel })}</div>`}
       ${ultime.length ? `<div class="card col"><div class="fila tra"><h3>${tn('prog.ultime', ultime.length)}</h3><span class="pic sec">${t('prog.giriEq')}</span></div>
-        ${barre(ultime.map(s => ({ v: giriEq(s), testo: fmtDec(giriEq(s)), sotto: fmtData(s.data, { day: 'numeric', month: 'numeric' }), leggero: s.fattore < 1 || s.interrotta })), { etichetta: t('prog.giriEq') })}
-        ${ultime.some(s => s.fattore < 1 || s.interrotta) ? `<span class="pic sec">${t('prog.legendaLeggere')}</span>` : ''}</div>` : ''}
+        ${barre(ultime.map(s => ({ v: giriEq(s), testo: fmtDec(giriEq(s)), sotto: fmtData(s.data, { day: 'numeric', month: 'numeric' }), leggero: s.fattore < 1 || s.interrotta, id: s.id,
+          aria: t('rep.apriDel', { data: fmtData(s.data, { day: 'numeric', month: 'long' }) }) })), { etichetta: t('prog.giriEq'), azione: 'report' })}
+        <span class="pic sec">${t('rep.toccaBarra')}${ultime.some(s => s.fattore < 1 || s.interrotta) ? ' ' + t('prog.legendaLeggere') : ''}</span></div>` : ''}
       <div class="griglia3">${[[S.sessioni.filter(s => s.tipo !== 'test').length, t('prog.sessioni')], [totGiri, t('prog.giriTotali')], [serie, t('prog.serie')]].map(([n, l]) => `<div class="card centro" style="padding:12px 8px"><div class="medio">${n}</div><span class="pic sec">${l}</span></div>`).join('')}</div>
       ${sezTest}
       ${v ? `<h2>${t('prog.livelli')}</h2><div class="card col"><div class="fila tra"><span class="forte">${t('prog.livelloGlobale')}</span><span class="pill ar">${t('risultato.liv', { n: v.globale })} · ${t('livelli.' + v.globale + '.nome')}</span></div>
@@ -74,6 +77,13 @@ registra('progressi', () => {
       tipo: el => { tipoSel = el.dataset.v; disegna(); },
       da: el => { confrontoDa = el.dataset.v; disegna(); },
       mese: el => { meseOff = Math.min(0, meseOff + Number(el.dataset.v)); disegna(); },
+      report: el => vai('report/' + el.dataset.v),
+      giornoCal: el => {
+        const del = S.sessioni.filter(s => s.tipo !== 'test' && s.data === el.dataset.v);
+        if (del.length === 1) return vai('report/' + del[0].id);
+        foglio(`<h2 style="margin:0">${t('rep.scegli')}</h2>${del.map(s => `<button class="riga alta" data-a="s" data-v="${s.id}"><span class="cresce" style="font-weight:600">${esc(titoloSessione(s))} · ${fmtPunti(s.giri, s.extra)} ${t('comune.giri')}</span><span class="sec">${ico('avanti', 18)}</span></button>`).join('')}
+          <button class="btn largo" data-a="chiudi">${t('comune.annulla')}</button>`, { s: (b, ev, chiudi) => { chiudi(); vai('report/' + b.dataset.v); } });
+      },
       misura: () => {
         foglio(`<h2 style="margin:0">${t('prog.nuovaMisura')}</h2><p class="pic sec">${t('prog.misuraTesto')}</p>
           <div class="griglia2">${MISURE.map(k => `<label class="campo">${t('prog.mis.' + k)} (${k === 'peso' ? 'kg' : 'cm'})<input type="number" inputmode="decimal" data-k="${k}"></label>`).join('')}</div>

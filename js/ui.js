@@ -1,6 +1,7 @@
 // Mattoncini dell'interfaccia: icone, fogli, avvisi, grafici, sagoma dei muscoli, condivisione.
 import { t } from './i18n.js';
 import { PER_ID } from '../data/esercizi.js';
+import { mmss } from './util.js';
 
 export const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -40,6 +41,8 @@ const ICONE = {
   telefono: '<rect x="7" y="2.500" width="10" height="19" rx="3"/><path d="M11 18h2"/>',
   cronometro: '<circle cx="12" cy="13" r="8"/><path d="M12 13V9M10 2.500h4"/>',
   nota: '<path d="M6 4h12v16H6z"/><path d="M9 9h6M9 13h6M9 17h3"/>',
+  video: '<rect x="3" y="5" width="18" height="14" rx="4"/><path d="M10 9.500v5l4.500-2.500z"/>',
+  battito: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
 };
 export const ico = (nome, dim = 20, extra = '') => `<svg width="${dim}" height="${dim}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${ICONE[nome] || ''}</svg>`;
 export const icoPlay = (dim = 14) => `<svg width="${dim}" height="${dim}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>`;
@@ -53,6 +56,13 @@ export function fmtQ(id, q) {
 export const fmtPunti = (giri, extra) => extra ? `${giri} + ${extra}` : String(giri);
 export const fmtData = (iso, opz = { day: 'numeric', month: 'short' }) => new Date(iso.length > 10 ? iso : iso + 'T12:00:00').toLocaleDateString('it-IT', opz);
 export const fmtDec = (n, d = 1) => Number(n).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+// Frase di lettura del report: { k, par } (da js/analisi.js) → testo, con date e numeri scritti all'italiana.
+export function testoFrase(f) {
+  const par = {};
+  for (const [k, v] of Object.entries(f.par || {})) par[k] = k === 'data' ? fmtData(v, { day: 'numeric', month: 'long' }) : k === 'giri' ? fmtDec(v) : k === 'sec' && f.k === 'zonaRossa' ? mmss(v) : v;
+  return t('rep.frase.' + f.k, par);
+}
 
 // ── Avatar: 6 colori fissi, sempre con testo scuro sopra
 export const COLORI_AVATAR = ['#FF9A4D', '#F2C14E', '#8FD3A8', '#7CC4E8', '#C3A6F0', '#F29CB7'];
@@ -95,11 +105,15 @@ export function conferma(titolo, testo, ok = t('comune.conferma'), annulla = t('
 }
 
 // ── Grafici (SVG e HTML semplici, senza librerie)
+// valori: [{ v, testo, sotto, leggero, id, aria }]. Con opz.azione ogni barra diventa un pulsante (data-a = azione, data-v = id).
 export function barre(valori, opz = {}) {
   if (!valori.length) return '';
   const max = Math.max(...valori.map(v => v.v), opz.min || 1);
-  return `<div class="barre" role="img" aria-label="${esc(opz.etichetta || '')}">${valori.map((v, i) =>
-    `<div class="${i === valori.length - 1 ? 'ult' : ''} ${v.leggero ? 'leg' : ''}"><span>${esc(v.testo)}</span><i style="height:${Math.max(4, Math.round(v.v / max * 100))}%"></i><span class="pic" style="font-family:var(--f);font-size:10px">${esc(v.sotto || '')}</span></div>`).join('')}</div>`;
+  const dentro = v => `<span>${esc(v.testo)}</span><i style="height:${Math.max(4, Math.round(v.v / max * 100))}%"></i><span class="pic" style="font-family:var(--f);font-size:10px">${esc(v.sotto || '')}</span>`;
+  const classe = (v, i) => `${i === valori.length - 1 ? 'ult' : ''} ${v.leggero ? 'leg' : ''}`;
+  if (opz.azione) return `<div class="barre" role="group" aria-label="${esc(opz.etichetta || '')}">${valori.map((v, i) =>
+    `<button class="${classe(v, i)}" data-a="${opz.azione}" data-v="${esc(v.id)}" aria-label="${esc(v.aria || v.testo)}">${dentro(v)}</button>`).join('')}</div>`;
+  return `<div class="barre" role="img" aria-label="${esc(opz.etichetta || '')}">${valori.map((v, i) => `<div class="${classe(v, i)}">${dentro(v)}</div>`).join('')}</div>`;
 }
 function punti(vals, w, h, lo, hi, m = 3) {
   const span = (hi - lo) || 1, n = Math.max(1, vals.length - 1);
@@ -164,4 +178,4 @@ export async function condividiFile(blob, nome, testo) {
   return 'scaricato';
 }
 export const interruttore = (azione, acceso, etichetta, extra = '') => `<button class="interruttore" role="switch" aria-checked="${acceso ? 'true' : 'false'}" aria-label="${esc(etichetta)}" data-a="${azione}" ${extra}></button>`;
-export const intestazione = (titolo, indietro = 'profilo') => `<div class="fila"><a class="ico-btn" href="#/${indietro}" aria-label="${esc(t('comune.indietro'))}">${ico('indietro')}</a><h1 style="font-size:24px">${esc(titolo)}</h1></div>`;
+export const intestazione = (titolo, indietro = 'profilo') => `<div class="fila"><a class="ico-btn" data-indietro href="#/${indietro}" aria-label="${esc(t('comune.indietro'))}">${ico('indietro')}</a><h1 style="font-size:24px">${esc(titolo)}</h1></div>`;

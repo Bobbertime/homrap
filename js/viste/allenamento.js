@@ -1,7 +1,7 @@
 // Flusso di un allenamento: anteprima → riscaldamento → AMRAP → fine sessione → riepilogo → defaticamento.
 import { S, salva, salvaSessione, contesto, oggi } from '../stato.js';
 import { t, tn, nomeEsercizio } from '../i18n.js';
-import { registra, vai, disegna } from '../router.js';
+import { registra, vai, disegna, rotta, vistaAttuale } from '../router.js';
 import { esc, ico, icoPlay, icoPausa, foglio, toast, fmtQ, fmtPunti, fmtData, fmtDec, condividiFile } from '../ui.js';
 import { prossimo, circuitoSessione, sostituisci, ripPerGiro, obiettivoGiri, giriEq, aggiornaTempi, alternative, serieGiorni } from '../logica.js';
 import { sfidaDelMese } from '../classifica.js';
@@ -232,12 +232,15 @@ function vistaRiepilogo() {
     ${s.interrotta ? `<p class="pic sec">${t('riep.interrotta')}</p>` : s.fattore < 1 ? `<p class="pic sec">${t('riep.ridotta')}</p>` : ''}
     ${s.orologio ? `<div class="card fila tra">${s.orologio.bpmMedio ? `<div><span class="pic sec forte">${t('riep.bpm')}</span><div class="medio">${s.orologio.bpmMedio}</div></div>` : ''}${s.orologio.bpmMax ? `<div><span class="pic sec forte">${t('riep.bpmMax')}</span><div class="medio">${s.orologio.bpmMax}</div></div>` : ''}${s.orologio.calorie ? `<div><span class="pic sec forte">${t('riep.kcal')}</span><div class="medio">${s.orologio.calorie}</div></div>` : ''}</div>` : ''}
     ${sugg ? cartaSuggerimento(sugg) : ''}
+    <a class="btn largo" href="#/report/${s.id}">${ico('battito')}${t('rep.apri')}</a>
     <button class="btn largo" data-a="condividi">${ico('condividi')}${t('riep.condividi')}</button>
     <div class="fondo-fisso"><button class="btn primario largo" data-a="defaticamento">${t('riep.defaticamento')}</button><button class="btn testo largo" data-a="chiudi">${t('riep.salta')}</button></div>`;
 }
 
 registra('allenamento', ([cosa = 'giorno']) => {
   if (!S.test.length || (cosa === 'giorno' && !S.piano)) return { html: '', dopo: () => vai('oggi', true) };   // prima il test iniziale
+  // Il riepilogo resta in memoria solo per andare al report e tornare indietro: arrivando da altrove si riparte da capo.
+  if (A && A.fase === 'riepilogo' && !['allenamento', 'report'].includes(vistaAttuale())) A = null;
   if (!A && S.attivo && S.attivo.cosa === cosa) { A = copia(S.attivo); if (A.fase === 'amrap') { schermoAcceso(true); avviaTic(); } }
   if (!A || A.cosa !== cosa) crea(cosa);
   if (A.fase === 'amrap' && !tic) { schermoAcceso(true); avviaTic(); }
@@ -319,6 +322,10 @@ registra('allenamento', ([cosa = 'giorno']) => {
       chiudi: () => { A = null; vai('oggi'); },
       ...azioniSuggerimento(disegna),
     },
-    esci: () => { fermaTic(); schermoAcceso(false); if (A && ['riepilogo', 'guida', 'anteprima', 'orologio', 'conto'].includes(A.fase)) A = null; },
+    esci: () => {
+      fermaTic(); schermoAcceso(false);
+      if (A && A.fase === 'riepilogo' && rotta().nome === 'report') return;   // dal report si torna al riepilogo
+      if (A && ['riepilogo', 'guida', 'anteprima', 'orologio', 'conto'].includes(A.fase)) A = null;
+    },
   };
 });

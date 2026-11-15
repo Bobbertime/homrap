@@ -30,10 +30,10 @@ Il file vuoto `.nojekyll` dice a GitHub di pubblicare i file così come sono: la
 Dopo ogni modifica ai file, apri `sw.js` e cambia la riga
 
 ```js
-const VERSIONE = 'homrap-1.0.2';
+const VERSIONE = 'homrap-1.0.3';
 ```
 
-per esempio in `homrap-1.0.3`. Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
+per esempio in `homrap-1.0.4` (e, se vuoi che si veda in fondo al Profilo, anche `VERSIONE` in `js/viste/profilo.js`). Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
 
 ### Provarla sul computer
 
@@ -62,11 +62,12 @@ data/soglie-test.js     prove del test e soglie dei livelli, per età e sesso
 i18n/it.js              tutte le stringhe in italiano
 
 js/app.js               avvio
-js/router.js            navigazione a hash (#/oggi, #/progressi …)
+js/router.js            navigazione a hash (#/oggi, #/progressi …) e posizione salvata tornando indietro
 js/stato.js             stato in memoria e salvataggio
 js/db.js                piccolo wrapper su IndexedDB
 js/backup.js            backup, checksum, versione dello schema e migrazioni
 js/logica.js            logica di allenamento: livelli, scelta esercizi, ripetizioni, piano, progressione, acquisti
+js/analisi.js           analisi di una sessione per il Report: battito massimo, zone, giri, confronto, frasi di lettura
 js/classifica.js        sfida del mese, codici personali e di gruppo, classifiche, frasi del confronto
 js/orologi.js           decoder FIT scritto a mano, lettura di TCX e GPX
 js/immagini.js          immagini 1080×1920 da condividere (canvas)
@@ -76,12 +77,12 @@ js/azioni.js            operazioni comuni a più schermate
 js/ui.js                icone SVG, fogli, grafici, sagoma dei muscoli, condivisione
 js/demo.js              modalità demo
 js/util.js              date, CRC32, base64url, generatore casuale con seme
-js/viste/               una schermata per file: onboarding, test, piano, oggi, allenamento, progressi, classifica, profilo
+js/viste/               una schermata per file: onboarding, test, piano, oggi, allenamento, progressi, report, classifica, profilo
 
 tests/run.mjs           test automatici della logica
 ```
 
-`logica.js`, `classifica.js`, `orologi.js`, `backup.js` e `util.js` sono moduli "puri": non toccano né la pagina né l'archivio, quindi si provano con Node.
+`logica.js`, `analisi.js`, `classifica.js`, `orologi.js`, `backup.js` e `util.js` sono moduli "puri": non toccano né la pagina né l'archivio, quindi si provano con Node.
 
 ### Test automatici
 
@@ -89,7 +90,7 @@ tests/run.mjs           test automatici della logica
 node tests/run.mjs
 ```
 
-Serve Node 18 o successivo. Sono 70 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni.
+Serve Node 18 o successivo. Sono 91 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione (anche con il battito), analisi della sessione per il Report (battito massimo, zone, giri, confronto, frasi), posizione salvata tornando indietro, link dei video, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato, niente battito né età), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni.
 
 ---
 
@@ -111,6 +112,24 @@ Serve Node 18 o successivo. Sono 70 test: ripetizioni e obiettivo di giri, scelt
 4. Cambia `VERSIONE` in `sw.js`.
 
 La logica non va toccata: l'esercizio entra da solo nella scelta, nelle alternative e nella libreria.
+
+### Il video di un esercizio
+
+Nella scheda di ogni esercizio c'è il pulsante **Guarda un video su YouTube**, che si apre fuori dall'app. Finché non scegli un video, il pulsante apre una ricerca su YouTube con il nome dell'esercizio in italiano più "esecuzione corretta". Nessun esercizio ha per ora un video scelto: i link non sono stati inventati.
+
+Per incollare il link di un video scelto a mano:
+
+1. Apri il video su YouTube, tocca **Condividi** → **Copia link**. Vanno bene i link del tipo `https://youtu.be/…` e `https://www.youtube.com/watch?v=…`.
+2. Apri `data/esercizi.js`, cerca la riga dell'esercizio (per esempio `id: 'squat'`) e aggiungi il campo `video` prima della graffa di chiusura, tra apici e con la virgola prima:
+
+   ```js
+   { id: 'squat', schema: 'gambe', …, dif: 'squat_jump', video: 'https://youtu.be/INCOLLA_QUI' },
+   ```
+
+3. Lancia `node tests/run.mjs`: un test controlla che ogni campo `video` sia un link `https` di YouTube. Se il link non è valido, l'app lo ignora e torna alla ricerca.
+4. Cambia `VERSIONE` in `sw.js`.
+
+La frase aggiunta alla ricerca si cambia in `i18n/it.js`, alla voce `esercizio.videoRicerca`.
 
 ### Un'animazione
 
@@ -191,6 +210,32 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - La settimana 4 è di scarico (circa −30%); dalla settimana 4 compare in Oggi l'invito al test mensile. Dopo il test l'app propone il piano del blocco successivo, che si accetta o si modifica.
 - Il primo promemoria del backup arriva dopo 3 sessioni, poi ogni 14 giorni e dopo ogni test mensile.
 
+**Report della sessione** (versione 1.0.3)
+
+- Il report è una schermata a sé (`#/report/<id della sessione>`). Si apre dal riepilogo di fine allenamento ("Vedi il report"), da Progressi toccando una barra delle ultime sessioni o un giorno colorato del calendario (se quel giorno ha più sessioni, l'app chiede quale), dopo l'import in Profilo → Orologio e anche dalla card "Fatto oggi" in Oggi. Si apre anche dopo l'inserimento manuale di battito e calorie. Dal report, "indietro" riporta al riepilogo, che resta com'era.
+- Battito massimo: campo facoltativo in Profilo → "Chi sei?" (da 120 a 230 bpm). Compare solo modificando il profilo, non nelle domande iniziali, per non allungarle. Se è compilato vince sempre. Se manca, si usa la stima dall'età (208 − 0,7 × età) oppure il battito più alto mai registrato dall'orologio, se è maggiore; i valori registrati sotto 100 o sopra 230 bpm sono ignorati come errori del sensore.
+- Zone di sforzo, come quota del battito massimo: Z1 sotto il 60%, Z2 60-70%, Z3 70-80%, Z4 80-90%, Z5 dal 90%. Il tempo in zona si calcola tratto per tratto sulla curva; i buchi più lunghi di 4 volte il passo tipico (e di 30 secondi) sono pause dell'orologio e non contano. Con il solo battito medio inserito a mano si vede la zona della media, non il tempo per zona.
+- Tempi dei giri: quelli presi dall'app; se mancano (allenamento fatto con l'orologio) i lap del file meno l'ultimo. Se ci sono sia i giri dell'app sia la curva, il battito medio di ogni giro si ottiene allineando le due ore di inizio, quando distano al massimo 15 minuti.
+- Il grafico dei giri è una linea a punti e non un istogramma: con le barre che partono da zero un calo del 10-15% quasi non si vede. Più in alto vuol dire giro più lento; la scala parte dal giro più veloce e la riga tratteggiata è la media.
+- "Calo finale" = quanto è più lungo in media l'ultimo terzo dei giri rispetto al primo terzo. Fino a +8% il ritmo è "regolare", da +8% calo lieve, da +15% calo forte; da −5% in giù è un finale in crescendo.
+- Confronto: con la sessione precedente dello stesso tipo di giorno (per la sfida: stesso mese e stessa variante), escluse quelle interrotte. Se esercizi, ripetizioni, durata o riduzione non sono identici, il report lo dice.
+- Lettura: 2 o 3 frasi scelte con regole fisse, in quest'ordine: ritmo dei giri; battito (zona 5 per almeno il 25% del tempo, media dal 90% del massimo, battito salito di almeno 8 bpm nella seconda metà a ritmo costante, altrimenti la fascia della media); confronto (differenze di almeno 0,25 giri, 3 bpm in meno o 5 bpm in più). Senza battito la terza frase è il confronto con l'obiettivo di giri. Le soglie sono in cima a `js/analisi.js` (`SOGLIE_REPORT`), i testi in `i18n/it.js` sotto `rep.frase`. Le frasi sono indicazioni, non un parere medico, e la schermata lo dice.
+- Immagine del report (1080×1920): se la sessione ha il battito, l'app chiede prima se metterlo nell'immagine; la scelta proposta per prima è "Senza battito". Età e battito massimo non compaiono mai nell'immagine. Con il battito ci stanno curva, giri e zone; senza, giri e frasi.
+- I dati di esempio della demo hanno ora i tempi dei giri e, una sessione su due, la curva del battito, così il report si può provare senza orologio.
+
+**Battito nella progressione suggerita** (versione 1.0.3)
+
+- Il battito conta solo quando c'è: serve il battito medio della sessione (dal file o inserito a mano) e il battito massimo. Senza, la regola è identica a prima.
+- Freno: se i giri per aumentare ci sono (due sessioni di fila con almeno un giro sopra l'obiettivo e fatica fino a 8) ma nell'ultima sessione il battito medio è stato dal **90%** del massimo in su, l'app non propone di aumentare. Al posto del suggerimento mostra la card "Per ora resta così" con il motivo e il solo pulsante "Ho capito"; la regola viene rivalutata dopo la sessione successiva.
+- Spinta: se per **due sessioni di fila** dello stesso giorno l'obiettivo di giri è raggiunto, la fatica segnata è **fino a 5** e il battito medio è **fino al 75%** del massimo in entrambe, l'app propone di aumentare anche senza il giro in più. Basta una condizione mancante (anche solo una sessione senza battito) perché non scatti.
+- La fatica da 9 in su fa sempre proporre di alleggerire, anche con battito basso. Il battito da solo non fa mai proporre di alleggerire.
+- Le soglie sono prudenti di proposito, perché il massimo stimato dall'età può sbagliare di una decina di battiti; si cambiano in `js/logica.js` (`BATTITO`). Resta tutto un suggerimento: il piano cambia solo toccando "Accetta".
+
+**Video e navigazione** (versione 1.0.3)
+
+- Il campo `video` degli esercizi è vuoto per tutti: non sono stati inventati link. Un link che non è un indirizzo `https` di YouTube viene ignorato.
+- Posizione salvata: ogni pagina aperta riceve un numero nella cronologia del browser. Tornando indietro (freccia dell'app, tasto indietro di Android, gesto di iOS) la pagina riparte da dove era; aprendo una pagina nuova, o andando avanti con il browser, si parte dall'alto. Le frecce "indietro" delle intestazioni tornano davvero indietro nella cronologia quando la pagina precedente è quella attesa; altrimenti aprono la pagina madre dall'alto. Anche "Salva" in una voce del Profilo riporta al Profilo nel punto in cui era (tranne quando la modifica richiede di rivedere il piano). Le posizioni restano in memoria finché l'app è aperta, e sopravvivono a una ricarica.
+
 **Orologio**
 
 - Nel file dell'orologio l'ultimo lap, quello chiuso dallo stop, è considerato il giro incompleto: i giri sono i lap meno uno.
@@ -201,6 +246,7 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - Formato dei codici: prefisso, punto, base64url di 1 byte (compresso sì/no), 4 byte di CRC32 e il JSON, compresso con deflate-raw solo se diventa più corto.
 - La sfida del mese ha 4 esercizi presi da 4 schemi diversi, scelti con un generatore casuale che usa il mese come seme: stessa sfida per tutti, senza server.
 - Le frasi del Confronto nascono da regole sui dati (sessioni, media giro, singole prove) e non parlano mai di corpo o peso.
+- Battito, calorie, fatica ed età non entrano mai nei codici, né in quello personale né in quello di gruppo: un test lo controlla anche con sessioni che hanno i dati dell'orologio. Il battito massimo serve solo ai calcoli fatti sul telefono.
 
 **Demo**
 
@@ -210,6 +256,13 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 
 ## 6. Limiti noti
 
+- **Report, suggerimenti con il battito, video e ritorno indietro (1.0.3):** provati con i test automatici e in Chrome senza interfaccia a 390 px, tema scuro e chiaro, con i dati della demo e un file TCX generato apposta. Non sono stati provati su telefoni veri né con file veri degli orologi.
+- **Battito massimo e zone:** la stima dall'età può sbagliare di una decina di battiti, quindi zone e soglie dei suggerimenti sono indicative finché non scrivi il tuo massimo nel profilo. La curva salvata ha al massimo 120 punti: su 20 minuti il tempo in zona è preciso a circa 10 secondi. Non è una valutazione medica.
+- **Giri dell'app e curva dell'orologio:** il battito per giro è giusto solo se telefono e orologio hanno l'ora sincronizzata. Se le due ore di inizio distano più di 15 minuti, o se il file non ha l'ora, la curva viene considerata partita insieme all'AMRAP.
+- **Sessioni senza tempi dei giri** (fatte con l'orologio senza importare il file, o inserite a mano): il report mostra solo numeri, confronto e frasi.
+- **Video:** finché il campo `video` è vuoto si apre una ricerca, e i risultati li decide YouTube. Come si apre "fuori dall'app" dipende dal telefono: su Android nell'app YouTube o nel browser, su iPhone può aprirsi in una scheda sopra l'app.
+- **Posizione salvata:** se nel frattempo la pagina è diventata più corta, si torna nel punto più vicino possibile. Chiudendo del tutto l'app le posizioni si perdono.
+- **Immagine del report:** con il battito non resta spazio per le frasi di lettura.
 - **Provata in un browser desktop** (Chrome senza interfaccia, 390 px, tema scuro e chiaro) e con i test automatici. Non è stata provata su un iPhone e su un Android veri: installazione, voce, vibrazione, schermo sempre acceso e condivisione verso WhatsApp vanno verificati sui telefoni.
 - **iPhone:** la vibrazione non esiste nelle web app; la voce può restare muta se il telefono è in modalità silenziosa; lo schermo sempre acceso richiede iOS 16.4 o successivo e, nell'app installata, sulle versioni di iOS meno recenti può non funzionare. Se l'app non viene installata, Safari può cancellare i dati dopo 7 giorni di inattività: l'app lo ricorda con un avviso fisso.
 - **Timer in secondo piano:** se durante l'AMRAP cambi app o blocchi il telefono, il tempo continua a scorrere correttamente, ma gli avvisi vocali di quel periodo vanno persi.

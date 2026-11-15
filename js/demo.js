@@ -42,9 +42,13 @@ export async function attivaDemo() {
     const esercizi = giorno.esercizi.map(x => ({ ...x, q: scarico ? Math.max(3, Math.round(x.q * 0.7)) : x.q }));
     const obiettivo = obiettivoGiri(esercizi, 20, ctx), rg = ripPerGiro(esercizi), avanzamento = (41 - g) / 40;
     const eq = obiettivo - 0.5 + avanzamento * 1.9 + r() * 0.3, giri = Math.floor(eq);
+    // Tempi dei giri (un po' più lenti verso la fine) e, una sessione su due, la curva del battito dell'orologio.
+    const tempiGiro = Array.from({ length: giri }, (_, i) => Math.round(1200 / eq * (0.91 + 0.18 * i / Math.max(1, giri - 1)) + (r() - 0.5) * 8));
+    const piano = 136 + Math.round(r() * 12), curva = Array.from({ length: 120 }, (_, i) => [i * 10, Math.round(98 + (piano - 98) * (1 - Math.exp(-i / 9)) + i / 120 * 16 + (r() - 0.5) * 6)]);
+    const battiti = curva.map(p => p[1]);
     await salvaSessione({ id: 'demo-s' + n, ts: ts(data), inizio: ts(data) - 20 * 60e3, data, tipo: 'amrap', blocco, tipoGiorno: giorno.tipo, focus: giorno.focus, rev: 0, fattore: scarico ? 0.7 : 1, motivo: scarico ? 'scarico' : null,
-      leggero: false, durata: 20, esercizi, obiettivo, ripGiro: rg, giri, extra: Math.round((eq - giri) * rg), tempiGiro: [], fatica: 6 + Math.round(r() * 2), fastidi: [], note: '', modalita: 'app',
-      orologio: n % 2 ? { bpmMedio: 138 + Math.round(r() * 12), bpmMax: 168 + Math.round(r() * 8), calorie: 190 + Math.round(r() * 40), durata: 1200 } : null });
+      leggero: false, durata: 20, esercizi, obiettivo, ripGiro: rg, giri, extra: Math.round((eq - giri) * rg), tempiGiro, fatica: 6 + Math.round(r() * 2), fastidi: [], note: '', modalita: 'app',
+      orologio: n % 2 ? { inizio: ts(data) - 20 * 60e3, durata: 1200, bpmMedio: Math.round(battiti.reduce((a, b) => a + b, 0) / battiti.length), bpmMax: Math.max(...battiti), calorie: 190 + Math.round(r() * 40), curva, giri: [] } : null });
     n++;
   }
   if (daIso(d).getDate() > 2) {

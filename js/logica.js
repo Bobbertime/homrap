@@ -266,6 +266,17 @@ export function serieGiorni(sessioni, perSettimana, oggi) {
 }
 
 // ───────────────────────── Progressione suggerita (mai automatica)
+// Soglie del battito, usate solo quando la sessione ha il battito medio e si conosce il massimo (ctx.bpmMax).
+export const BATTITO = {
+  alto: 0.90,        // media dell'ultima sessione dal 90% del massimo in su: niente aumento, anche se i giri ci sono
+  basso: 0.75,       // media fino al 75% del massimo…
+  faticaBassa: 5,    // …con fatica fino a 5, per due sessioni di fila e con l'obiettivo raggiunto: si può aumentare
+};
+// Quota del battito massimo tenuta in media nella sessione; null se manca il battito o il massimo.
+export function quotaBattito(s, ctx) {
+  const b = s && s.orologio ? Number(s.orologio.bpmMedio) : 0, max = Number(ctx && ctx.bpmMax);
+  return b >= 40 && b <= 230 && max >= 100 ? b / max : null;
+}
 function relativa(da, a, q, ctx) {
   return da.rif && da.rif === a.rif ? rifinisci(a, q * a.k / da.k) : quantita(a, ctx).q;
 }
@@ -303,18 +314,28 @@ export function valutaProgressione(piano, idx, sessioni, ctx) {
   const ult = s[s.length - 1], due = s.slice(-2);
   if (g.rimandato === ult.id) return null;
   let tipo = null, motivo = null;
+  const quota = quotaBattito(ult, ctx), base = { idx, tipoGiorno: g.tipo, sessione: ult.id };
+  if (quota != null) base.battito = Math.round(quota * 100);     // per il testo della card
   if (ult.fatica >= 9) { tipo = 'alleggerisci'; motivo = 'fatica'; }
-  else if (due.length === 2 && due.every(x => giriEq(x) >= x.obiettivo + 1 && (x.fatica || 5) <= 8)) { tipo = 'aumenta'; motivo = 'sopra'; }
+  else if (due.length === 2 && due.every(x => giriEq(x) >= x.obiettivo + 1 && (x.fatica || 5) <= 8)) {
+    // I giri ci sono, ma il cuore lavora già vicino al massimo: per ora si resta così.
+    if (quota != null && quota >= BATTITO.alto) return { tipo: 'mantieni', motivo: 'battitoAlto', ...base, modifiche: [] };
+    tipo = 'aumenta'; motivo = 'sopra';
+  }
   else if (due.length === 2 && due.every(x => giriEq(x) <= x.obiettivo - 1)) { tipo = 'alleggerisci'; motivo = 'sotto'; }
+  // Obiettivo raggiunto due volte di fila con fatica bassa e battito basso: si può aumentare anche senza il giro in più.
+  else if (due.length === 2 && due.every(x => { const q = quotaBattito(x, ctx);
+    return giriEq(x) >= x.obiettivo && x.fatica != null && x.fatica <= BATTITO.faticaBassa && q != null && q <= BATTITO.basso; })) { tipo = 'aumenta'; motivo = 'facile'; }
   if (!tipo) return null;
   const voci = g.esercizi.map((x, i) => ({ x, i, e: PER_ID[x.id] })).filter(v => v.e && !v.e.fisso);
   const intensita = v => v.x.q / Math.max(1, capDi(v.e, ctx) * v.e.k);
   voci.sort((a, b) => tipo === 'aumenta' ? intensita(a) - intensita(b) : intensita(b) - intensita(a)); // aumenta sui più facili
   const modifiche = voci.slice(0, 3).map(v => modifica(g, v, tipo, ctx)).filter(Boolean).sort((a, b) => a.i - b.i);
-  return modifiche.length ? { tipo, motivo, idx, tipoGiorno: g.tipo, sessione: ult.id, modifiche } : null;
+  return modifiche.length ? { tipo, motivo, ...base, modifiche } : null;
 }
 export function applicaModifiche(piano, sugg) {
   const g = piano.giorni[sugg.idx];
+  if (!sugg.modifiche || !sugg.modifiche.length) return;   // «mantieni» non cambia il piano
   for (const m of sugg.modifiche) {
     const v = { slot: g.esercizi[m.i].slot, id: m.a, q: m.q1 };
     if (m.kg1 != null) v.kg = m.kg1;

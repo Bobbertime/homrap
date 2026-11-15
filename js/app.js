@@ -11,6 +11,7 @@ import './viste/piano.js';
 import './viste/oggi.js';
 import './viste/allenamento.js';
 import './viste/progressi.js';
+import './viste/report.js';
 import './viste/classifica.js';
 import './viste/profilo.js';
 

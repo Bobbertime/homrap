@@ -17,9 +17,11 @@ export const testoModifica = m => m.a !== m.da ? `${esc(nomeEsercizio(m.da))} â†
   : `${esc(nomeEsercizio(m.da))} ${fmtVoce({ id: m.da, q: m.q0, kg: m.kg0 })} â†’ ${fmtVoce({ id: m.a, q: m.q1, kg: m.kg1 })}`;
 export function cartaSuggerimento(s) {
   return `<div class="card tenue avviso"><span class="tondo">${ico('lampadina')}</span><div class="col stretti cresce">
-    <span class="etichetta">${t('sugg.titolo', { tipo: s.tipoGiorno })}</span><h3>${t('sugg.' + s.tipo)}</h3><p class="pic">${t('sugg.motivo.' + s.motivo)}</p>
-    <ul class="punti pic forte">${s.modifiche.map(m => `<li>${testoModifica(m)}</li>`).join('')}</ul>
-    <div class="fila stretti" style="margin-top:4px"><button class="btn primario piccolo" data-a="suggSi">${t('sugg.accetta')}</button><button class="btn piccolo" data-a="suggNo">${t('sugg.nonOra')}</button></div></div></div>`;
+    <span class="etichetta">${t('sugg.titolo', { tipo: s.tipoGiorno })}</span><h3>${t('sugg.' + s.tipo)}</h3>
+    <p class="pic">${t('sugg.motivo.' + s.motivo, { pct: s.battito })}${s.motivo === 'sopra' && s.battito != null ? ' ' + t('sugg.battitoOk', { pct: s.battito }) : ''}</p>
+    ${s.modifiche.length ? `<ul class="punti pic forte">${s.modifiche.map(m => `<li>${testoModifica(m)}</li>`).join('')}</ul>` : ''}
+    <div class="fila stretti" style="margin-top:4px">${s.tipo === 'mantieni' ? `<button class="btn primario piccolo" data-a="suggNo">${t('sugg.capito')}</button>`
+      : `<button class="btn primario piccolo" data-a="suggSi">${t('sugg.accetta')}</button><button class="btn piccolo" data-a="suggNo">${t('sugg.nonOra')}</button>`}</div></div></div>`;
 }
 export function suggerimentoAttivo() {
   if (!S.piano) return null;
@@ -28,7 +30,7 @@ export function suggerimentoAttivo() {
   return null;
 }
 export const azioniSuggerimento = dopo => ({
-  suggSi: async () => { const s = suggerimentoAttivo(); if (!s) return; applicaModifiche(S.piano, s); await salva('piano'); toast(t('sugg.applicato')); dopo(); },
+  suggSi: async () => { const s = suggerimentoAttivo(); if (!s || !s.modifiche.length) return; applicaModifiche(S.piano, s); await salva('piano'); toast(t('sugg.applicato')); dopo(); },
   suggNo: async () => { const s = suggerimentoAttivo(); if (!s) return; S.piano.giorni[s.idx].rimandato = s.sessione; await salva('piano'); dopo(); },
 });
 
@@ -79,7 +81,7 @@ registra('oggi', () => {
     : `<div class="card grande col stretti"><span class="pill ar" style="align-self:flex-start">${t(fattaOggi ? 'oggi.fatto' : 'oggi.riposo')}</span>
       ${fattaOggi ? `<div class="fila base"><span class="grosso">${fmtPunti(fattaOggi.giri, fattaOggi.extra)}</span><span class="sec forte">${t('comune.giri')}</span></div>` : `<div class="titolone" style="font-size:32px;margin-top:4px">${t('oggi.riposoTitolo')}</div>`}
       <p class="sec" style="font-weight:600">${t('oggi.prossimo', { giorno: fmtData(pr.data, { weekday: 'long', day: 'numeric', month: 'long' }), tipo: c.tipo })}</p>
-      <button class="btn" style="align-self:flex-start;margin-top:8px" data-a="comunque">${t('oggi.comunque')}</button></div>`;
+      <div class="fila avvolgi stretti" style="margin-top:8px">${fattaOggi ? `<a class="btn primario" href="#/report/${fattaOggi.id}">${ico('battito')}${t('rep.apri')}</a>` : ''}<button class="btn" data-a="comunque">${t('oggi.comunque')}</button></div></div>`;
 
   // Sfida del mese
   const mese = meseISO(d), sfida = sfidaDelMese(mese), best = migliorSfida(S.sessioni, mese);

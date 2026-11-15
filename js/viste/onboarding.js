@@ -1,7 +1,7 @@
 // Benvenuto, installazione guidata e onboarding in 8 passi. Gli stessi passi servono per le modifiche dal Profilo.
 import { S, salva } from '../stato.js';
 import { t, tn } from '../i18n.js';
-import { registra, vai, disegna } from '../router.js';
+import { registra, vai, disegna, indietro } from '../router.js';
 import { esc, ico, toast, interruttore, intestazione } from '../ui.js';
 import { OBIETTIVI, GIORNI_PREDEFINITI } from '../logica.js';
 import { ATTREZZI } from '../../data/attrezzi.js';
@@ -30,8 +30,10 @@ const PASSI = [
         <div class="fila">${chip('sesso', 'F', t('onb.chi.f'), p.sesso === 'F')}${chip('sesso', 'M', t('onb.chi.m'), p.sesso === 'M')}</div></div>
       <div class="griglia2"><label class="campo">${t('onb.chi.altezza')}<input data-i="campo" data-k="altezza" type="number" inputmode="numeric" value="${esc(p.altezza)}"></label>
         <label class="campo">${t('onb.chi.peso')}<input data-i="campo" data-k="peso" type="number" inputmode="decimal" value="${esc(p.peso)}"></label></div>
+      ${origine === 'onboarding' ? '' : `<label class="campo">${t('onb.chi.bpmMax')}<input data-i="campo" data-k="bpmMax" type="number" inputmode="numeric" min="120" max="230" value="${esc(p.bpmMax || '')}"></label>
+        <p class="pic sec">${t('onb.chi.bpmMaxNota')}</p>`}
       <p class="pic sec">${t('onb.chi.nota')}</p>`,
-    valido: ({ profilo: p }) => String(p.nome).trim().length > 0 && Number(p.eta) >= 12 && Number(p.eta) <= 99 },
+    valido: ({ profilo: p }) => String(p.nome).trim().length > 0 && Number(p.eta) >= 12 && Number(p.eta) <= 99 && (!p.bpmMax || (Number(p.bpmMax) >= 120 && Number(p.bpmMax) <= 230)) },
   { id: 'sicurezza',
     html: ({ profilo: p }) => `
       <button class="btn piccolo" data-a="tutteNo" style="align-self:flex-start">${t('onb.sic.tutteNo')}</button>
@@ -116,7 +118,7 @@ const AZIONI = {
 };
 async function salvaBozza() {
   const p = B.profilo;
-  p.nome = String(p.nome).trim(); p.eta = Number(p.eta);
+  p.nome = String(p.nome).trim(); p.eta = Number(p.eta); p.bpmMax = p.bpmMax ? Math.round(Number(p.bpmMax)) : '';
   p.altezza = p.altezza ? Number(p.altezza) : ''; p.peso = p.peso ? Number(String(p.peso).replace(',', '.')) : '';
   p.sicurezza.cauto = siAlmenoUno(p);
   const nuovi = Object.keys(B.attrezzi).filter(a => !S.attrezzi[a]);
@@ -184,7 +186,7 @@ registra('modifica', ([id]) => {
       <div class="fondo-fisso"><button class="btn primario largo" id="avanti" data-a="salva" ${P.valido(B) ? '' : 'disabled'}>${t('comune.salva')}</button></div></main>`,
     azioni: { ...AZIONI, salva: async () => {
       await salvaBozza(); B = null; toast(t('comune.salvato'));
-      vai(S.piano && ['sicurezza', 'obiettivi', 'esperienza', 'zone', 'disponibilita', 'attrezzatura'].includes(P.id) ? 'piano/aggiorna' : 'profilo');
+      if (S.piano && ['sicurezza', 'obiettivi', 'esperienza', 'zone', 'disponibilita', 'attrezzatura'].includes(P.id)) vai('piano/aggiorna'); else indietro('profilo');
     } },
     esci: () => { B = null; },
   };

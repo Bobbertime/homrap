@@ -1,7 +1,7 @@
 // Scheda Profilo e schermate collegate: libreria esercizi, scheda esercizio, cosa comprare, orologi, sicurezza.
 import { S, salva, salvaSessione, contesto, importa, cancellaTutto, valutazione, oggi } from '../stato.js';
 import { t, tn, nomeEsercizio } from '../i18n.js';
-import { registra, vai, disegna } from '../router.js';
+import { registra, vai, disegna, indietro } from '../router.js';
 import { esc, ico, foglio, toast, conferma, avatar, sagoma, interruttore, intestazione, fmtData, fmtPunti, copiaTesto } from '../ui.js';
 import { consigliAcquisto, haAttrezzi, OBIETTIVI } from '../logica.js';
 import { iniziali } from '../classifica.js';
@@ -10,9 +10,9 @@ import { verificaBackup } from '../backup.js';
 import { salvaBackup, applicaTema, riammetti, risolviFastidio } from '../azioni.js';
 import { leggiFileOrologio, abbina, giriDaLap } from '../orologi.js';
 import { attivaDemo, disattivaDemo } from '../demo.js';
-import { mmss } from '../util.js';
+import { mmss, linkVideo } from '../util.js';
 
-export const VERSIONE = '1.0.2';
+export const VERSIONE = '1.0.3';
 
 export async function ripristinaDaFile(file, dopo) {
   if (!file) return;
@@ -38,7 +38,7 @@ registra('profilo', () => {
       <div class="fila">${avatar(iniziali(p.nome), S.io.colore, 64)}<div><h1 style="font-size:28px">${esc(p.nome || '')}</h1><div class="sec">${v ? `${t('risultato.livello', { n: v.globale })} · ${t('livelli.' + v.globale + '.nome')}` : t('prof.senzaTest')}</div></div></div>
       ${S.stato.demo ? `<div class="card tenue avviso"><span class="tondo">${ico('occhio')}</span><p class="pic forte">${t('demo.attiva')}</p></div>` : ''}
       <h2>${t('prof.tuoProfilo')}</h2><div class="col stretti">
-        ${voce('persona', t('onb.chi.titolo'), [p.eta ? tn('prof.anni', p.eta) : '', p.altezza ? p.altezza + ' cm' : '', p.peso ? p.peso + ' kg' : ''].filter(Boolean).join(' · '), 'modifica/chi')}
+        ${voce('persona', t('onb.chi.titolo'), [p.eta ? tn('prof.anni', p.eta) : '', p.altezza ? p.altezza + ' cm' : '', p.peso ? p.peso + ' kg' : '', p.bpmMax ? t('prof.bpmMax', { n: p.bpmMax }) : ''].filter(Boolean).join(' · '), 'modifica/chi')}
         ${voce('bersaglio', t('prof.obiettivi'), (p.obiettivi || []).map(o => t('obiettivi.' + o + '.nome')).join(', '), 'modifica/obiettivi')}
         ${voce('grafico', t('prof.esperienza'), p.esperienza ? t('esperienza.' + p.esperienza + '.nome') : '', 'modifica/esperienza')}
         ${voce('corpo', t('prof.zone'), [...(p.infortuni || []), ...(p.zoneMeno || [])].map(z => t('zone.' + z)).join(', ') || t('prof.nessuna'), 'modifica/zone')}
@@ -89,6 +89,7 @@ registra('esercizio', ([id]) => {
   const e = PER_ID[id];
   if (!e) return { html: '', dopo: () => vai('libreria', true) };
   const T = k => t('esercizi.' + id + '.' + k), no = S.esercizi.scartati.includes(id);
+  const video = linkVideo(e.video, T('nome'), t('esercizio.videoRicerca'));   // video scelto a mano, oppure una ricerca su YouTube
   const collegato = (k, eid) => eid && PER_ID[eid] ? `<a class="riga alta" href="#/esercizio/${eid}" style="text-decoration:none;color:inherit"><span class="cresce"><span class="pic sec forte" style="display:block">${t('esercizio.' + k)}</span><span class="forte">${esc(nomeEsercizio(eid))}</span></span><span class="sec">${ico('avanti', 18)}</span></a>` : '';
   return {
     html: `<main class="pagina piena">
@@ -100,10 +101,12 @@ registra('esercizio', ([id]) => {
       <div class="card col stretti"><h3>${t('esercizio.consigli')}</h3><ul class="punti">${T('consigli').map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
       <div class="card col stretti"><h3>${t('esercizio.errori')}</h3><ul class="punti">${T('errori').map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
       <div class="card col stretti"><h3>${t('esercizio.respiro')}</h3><p>${esc(T('respiro'))}</p></div>
+      <div class="col stretti"><a class="btn largo" href="${esc(video.url)}" target="_blank" rel="noopener noreferrer external">${ico('video')}${t('esercizio.video')}</a>
+        <span class="pic sec centro">${t(video.ricerca ? 'esercizio.videoNotaRicerca' : 'esercizio.videoNota')}</span></div>
       <div class="col stretti">${collegato('piuFacile', e.fac)}${collegato('piuDifficile', e.dif)}</div>
       <div class="riga alta"><span class="cresce"><span class="forte" style="display:block">${t('esercizio.escludi')}</span><span class="pic sec">${t('esercizio.escludiDesc')}</span></span>${interruttore('escludi', no, t('esercizio.escludi'))}</div></main>`,
     azioni: {
-      indietro: () => history.length > 1 ? history.back() : vai('libreria'),
+      indietro: () => indietro('libreria'),
       escludi: async () => { if (no) await riammetti(id); else await risolviFastidio(id, 'escludi'); toast(t(no ? 'esercizio.riammesso' : 'esercizio.escluso')); disegna(); },
     },
   };
@@ -124,7 +127,7 @@ const MARCHE = ['garmin', 'apple', 'fitbit', 'polar', 'suunto', 'coros', 'amazfi
 const etichettaSessione = s => `${fmtData(s.data, { weekday: 'short', day: 'numeric', month: 'short' })} · ${s.tipo === 'sfida' ? t('cla.quale.sfida') : t('piano.giorno', { tipo: s.tipoGiorno })} · ${fmtPunti(s.giri, s.extra)}`;
 async function collega(s, d) {
   const lap = giriDaLap(d);
-  const fine = async giri => { s.orologio = d; if (giri != null) s.giri = giri; await salvaSessione(s); toast(t('oro.collegato')); disegna(); };
+  const fine = async giri => { s.orologio = d; if (giri != null) s.giri = giri; await salvaSessione(s); toast(t('oro.collegato')); vai('report/' + s.id); };   // dopo l'import si apre il report
   if (d.giri.length && lap !== s.giri) {
     foglio(`<h2 style="margin:0">${t('fine.lapTitolo')}</h2><p class="sec">${t('fine.lapTesto', { lap, app: s.giri })}</p>
       <button class="btn primario largo" data-a="file">${tn('fine.lapUsaFile', lap)}</button><button class="btn largo" data-a="app">${tn('fine.lapUsaApp', s.giri)}</button>`,
@@ -170,7 +173,7 @@ registra('orologi', () => {
         { ok: async (b, ev, chiudi, velo) => {
           const val = k => Number(String(velo.querySelector(`[data-k="${k}"]`).value).replace(',', '.')) || null;
           s.orologio = { ...o, durata: val('durata') ? Math.round(val('durata') * 60) : null, bpmMedio: val('bpmMedio'), calorie: val('calorie') };
-          await salvaSessione(s); chiudi(); toast(t('comune.salvato'));
+          await salvaSessione(s); chiudi(); toast(t('comune.salvato')); vai('report/' + s.id);
         } });
       }),
     },

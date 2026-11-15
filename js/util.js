@@ -47,3 +47,13 @@ export function prng(seme) {
   return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 export const copia = o => JSON.parse(JSON.stringify(o));
+// Link del pulsante «Guarda un video su YouTube»: il video scelto a mano (campo "video" dell'esercizio), se è un
+// indirizzo di YouTube valido; altrimenti una ricerca con il nome dell'esercizio e la frase di ricerca.
+export function eYouTube(url) {
+  try { const u = new URL(String(url)); return u.protocol === 'https:' && /^((www|m)\.)?(youtube\.com|youtube-nocookie\.com)$|^youtu\.be$/.test(u.hostname) && (u.pathname.length > 1 || u.search.length > 1); }
+  catch { return false; }
+}
+export function linkVideo(video, nome, frase = '') {
+  if (video && eYouTube(video)) return { url: String(video), ricerca: false };
+  return { url: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`${nome} ${frase}`.trim()), ricerca: true };
+}
