@@ -10,7 +10,8 @@ import { ESERCIZI, PER_ID, SCHEMI, ZONE } from '../data/esercizi.js';
 import { ATTREZZI } from '../data/attrezzi.js';
 import { PROVE } from '../data/soglie-test.js';
 import { IT } from '../i18n/it.js';
-import { t } from '../js/i18n.js';
+import { EN } from '../i18n/en.js';
+import { t, tn, impostaLingua, lingua, locale } from '../js/i18n.js';
 import { piuGiorni, settimanaISO, lunedi, linkVideo, eYouTube } from '../js/util.js';
 import * as A from '../js/analisi.js';
 import { passoNav } from '../js/router.js';
@@ -78,6 +79,18 @@ prova('più zone infortunate insieme: il piano resta completo', () => { const c 
 prova('zone da sforzare meno: abbassano il punteggio ma non escludono', () => {
   const c = ctxBase({ zoneMeno: ['polsi'] }); vero(L.ammessi('spinta', c).some(e => e.id === 'piegamenti'));
   vero(L.punteggio(PER_ID.piegamenti, c, 3) < L.punteggio(PER_ID.piegamenti, ctxBase(), 3)); });
+prova('un solo manubrio: niente esercizi che ne vogliono due, restano quelli a un braccio e il piano è completo', () => {
+  const uno = { manubri: { kg: [6, 10], singolo: true } }, due = { manubri: { kg: [6, 10] } }, con = inv => ESERCIZI.filter(e => e.att.length && L.haAttrezzi(e, inv)).map(e => e.id);
+  uguale(ESERCIZI.filter(e => e.paio).map(e => e.id), ['distensioni_terra', 'lento_avanti']); for (const e of ESERCIZI.filter(x => x.paio)) vero(e.att.flat().includes('manubri') && !e.lato, e.id);
+  uguale(con(uno), ['distensioni_terra_un_braccio', 'lento_avanti_un_braccio', 'rematore_manubrio', 'goblet_squat', 'stacco_rumeno']); uguale(con(due).length, 7);
+  for (const id of ['distensioni_terra_un_braccio', 'lento_avanti_un_braccio']) vero(PER_ID[id].lato, id + ': ripetizioni per lato');
+  for (const ob of L.OBIETTIVI) { const c = ctxBase({ obiettivi: [ob], attrezzi: uno }); for (const g of L.generaPiano(c, OGGI).giorni) { uguale(g.esercizi.length, 5); for (const x of g.esercizi) vero(!PER_ID[x.id].paio, `${ob}: ${x.id}`); } }
+  const p = L.generaPiano(ctxBase({ obiettivi: ['forza'], attrezzi: due }), OGGI), i = p.giorni.findIndex(g => g.esercizi.some(x => PER_ID[x.id].paio));
+  if (i >= 0) { const c = L.circuitoSessione(p, i, ctxBase({ obiettivi: ['forza'], attrezzi: uno }), [], OGGI); for (const x of c.esercizi) vero(!PER_ID[x.id].paio, 'il piano vecchio va adattato: ' + x.id); }
+  uguale(L.quantita(PER_ID.goblet_squat, ctxBase({ attrezzi: uno })).kg, 10, 'i kg restano quelli che hai'); });
+prova('kettlebell: sei esercizi, compresi rematore, stacco e le spinte a un braccio', () => {
+  const k = { kettlebell: { kg: [8, 12] } }; uguale(ESERCIZI.filter(e => e.att.length && L.haAttrezzi(e, k)).map(e => e.id).sort(), ['distensioni_terra_un_braccio', 'goblet_squat', 'kettlebell_swing', 'lento_avanti_un_braccio', 'rematore_manubrio', 'stacco_rumeno']);
+  vero(L.quantita(PER_ID.rematore_manubrio, ctxBase({ attrezzi: k })).kg != null, 'kg suggeriti anche con la kettlebell'); });
 prova('esercizi scartati non vengono scelti', () => { const primo = L.scegli('gambe', ctxBase()); const c = ctxBase({ scartati: [primo.id] }); vero(L.scegli('gambe', c).id !== primo.id); });
 prova('livello adatto al test: mai sopra il livello dell\'area', () => { for (const liv of [1, 2, 3, 4, 5]) { const c = ctxBase({ livelli: Object.fromEntries(L.AREE.map(a => [a, liv])) }); for (const s of ['spinta', 'gambe', 'core', 'cond', 'posteriore']) vero(L.scegli(s, c).liv <= liv, `${s} liv ${liv}`); } });
 prova('a parità di punteggio vince il corpo libero', () => { const g = L.graduatoria('spinta', ctxBase({ attrezzi: { pushup_bars: true } })); for (let i = 1; i < g.length; i++) vero(g[i - 1].p > g[i].p || g[i - 1].e.att.length <= g[i].e.att.length); });
@@ -228,6 +241,28 @@ prova('lettura: sempre 2 o 3 frasi, ognuna con il suo testo', () => {
   const casi = [sRep(), sRep({ tempiGiro: [] }), sRep({ interrotta: true }), sRep({ fatica: 9, orologio: { bpmMedio: 120 } }), sRep({ fatica: 4, orologio: { bpmMedio: 165 } }), sRep({ tempiGiro: [200], obiettivo: 0 })];
   for (const s of casi) { const f = A.analizza(s, [], { eta: 40 }).frasi; vero(f.length >= (s.obiettivo ? 2 : 1) && f.length <= 3, JSON.stringify(f)); for (const x of f) vero(IT.rep.frase[x.k], 'manca il testo di ' + x.k); uguale(new Set(f.map(x => x.k)).size, f.length); }
   for (const k of ['interrotta', 'caloForte', 'caloLieve', 'crescendo', 'costante', 'zonaRossa', 'cuoreMoltoAlto', 'cuoreAlto', 'cuoreMedio', 'cuoreBasso', 'deriva', 'circuitoCambiato', 'meglioMenoBattito', 'piuGiri', 'menoGiri', 'stessoMenoBattito', 'stessoPiuBattito', 'stabile', 'primaVolta', 'faticaSenzaBattito', 'battitoSenzaFatica', 'sopraObiettivo', 'sottoObiettivo', 'inObiettivo']) vero(IT.rep.frase[k], k); });
+prova('andamento: solo sessioni complete e a ripetizioni piene del tipo di giorno; tendenza da 4 sessioni con il battito', () => {
+  const con = (i, eq, b, extra = {}) => sRep({ id: 'a' + i, ts: i, data: piuGiorni('2026-10-01', i * 7), giri: eq, orologio: b ? { bpmMedio: b } : null, ...extra });
+  const ss = [con(1, 6, 152), con(2, 6, 151), con(3, 6, null), con(4, 6, 147), con(5, 6, 146), con(6, 6, 140, { interrotta: true }), con(7, 6, 140, { fattore: 0.7 }), con(8, 6, 140, { tipoGiorno: 'B' })];
+  const p = A.andamento(ss, 'A', 180); uguale(p.map(x => x.id), ['a1', 'a2', 'a3', 'a4', 'a5']); uguale(p.map(x => x.bpm), [152, 151, null, 147, 146]); uguale(Math.round(p[0].calo * 100), 4);
+  uguale(A.tendenza(p), { k: 'efficienza', par: { giri: 0, bpm: 5, n: 4 } }); uguale(A.tendenza(p.slice(0, 3)), null, 'servono 4 sessioni con il battito');
+  const t2 = (a, b) => A.tendenza([{ eq: a[0], bpm: b[0] }, { eq: a[1], bpm: b[1] }, { eq: a[2], bpm: b[2] }, { eq: a[3], bpm: b[3] }]).k;
+  uguale([t2([6, 6, 6.5, 6.6], [140, 140, 146, 146]), t2([6, 6, 6, 6], [140, 140, 146, 146]), t2([6, 6, 6, 6.1], [140, 141, 141, 140])], ['piuLavoro', 'piuSforzo', 'stabile']); });
+prova('carico della settimana: minuti × fatica, e avviso quando sale del 30% o dopo 3 sessioni a fatica 8+', () => {
+  const s = (data, fatica, extra = {}) => sRep({ ts: Date.parse(data) + (++nS), data, fatica, ...extra });   // OGGI = lunedì 16 novembre 2026
+  const base = [s('2026-10-26', 6), s('2026-10-28', 6), s('2026-11-02', 6), s('2026-11-04', 6), s('2026-11-09', 6), s('2026-11-11', 6)];
+  const sett = A.caricoSettimane([...base, s('2026-11-16', 7)], OGGI, 4); uguale(sett.map(w => [w.lunedi, w.sessioni, w.carico]), [['2026-10-26', 2, 240], ['2026-11-02', 2, 240], ['2026-11-09', 2, 240], ['2026-11-16', 1, 140]]);
+  uguale(A.caricoSettimane([s('2026-11-16', null), s('2026-11-17', 8, { interrotta: true, tempiGiro: [300, 300] }), { ...s('2026-11-18', 9), tipo: 'test' }], OGGI, 1)[0].carico, 100 + 80, 'fatica mancante = 5; interrotta = minuti fatti; i test non contano');
+  uguale(A.avvisoCarico([...base, s('2026-11-16', 7)], '2026-11-17'), null, 'una sola sessione nella settimana');
+  uguale(A.avvisoCarico([...base, s('2026-11-16', 7), s('2026-11-18', 7)], '2026-11-18'), null, '280 contro 240: +17%');
+  uguale(A.avvisoCarico([...base, s('2026-11-16', 8), s('2026-11-18', 8)], '2026-11-18'), { k: 'salito', par: { pct: 33 } });
+  uguale(A.avvisoCarico([s('2026-11-16', 8), s('2026-11-18', 8)], '2026-11-18'), null, 'senza settimane di confronto');
+  uguale(A.avvisoCarico([s('2026-11-10', 8), s('2026-11-12', 9), s('2026-11-16', 8)], '2026-11-17'), { k: 'faticaAlta', par: {} });
+  uguale(A.avvisoCarico([s('2026-11-10', 8), s('2026-11-12', 7), s('2026-11-16', 8)], '2026-11-17'), null);
+  uguale(A.avvisoCarico([s('2026-10-01', 9), s('2026-10-02', 9), s('2026-10-03', 9)], '2026-11-17'), null, 'sessioni vecchie'); });
+prova('battito di recupero nel test: differenza in un minuto, solo con due valori plausibili', () => {
+  uguale(A.recuperoBattito({ battito: { fine: '168', dopo: 139 } }), { fine: 168, dopo: 139, calo: 29 }); uguale(A.recuperoBattito({ battito: { fine: '', dopo: '' } }), null);
+  uguale(A.recuperoBattito({ battito: { fine: 168, dopo: 300 } }), null); uguale(A.recuperoBattito({ ris: RIS }), null); });
 
 gruppo('Navigazione e video');
 prova('tornando indietro si ripristina lo scorrimento, andando avanti si parte dall\'alto', () => {
@@ -266,7 +301,7 @@ prova('nei codici non entrano mai età, peso, misure, zone o sicurezza', () => {
 await prova('battito ed età non entrano mai nei codici, nemmeno con i dati dell\'orologio', async () => {
   const conOrologio = sess.map((s, i) => ({ ...s, orologio: { inizio: 1, durata: 1200, bpmMedio: 151 + i, bpmMax: 177 + i, calorie: 333, curva: [[0, 101], [10, 177 + i]], giri: [{ durata: 173 }] } }));
   for (const dettagli of [true, false]) for (const tipo of ['m', 'w']) {
-    const d = C.datiPersonali({ io: { id: 'abc123', nome: 'Roby M', colore: 2 }, sessioni: conOrologio, test: testC, perSettimana: 3, profilo: { eta: 47, bpmMax: 189 } }, { tipo, dettagli }, '2026-11-16', 1e12), s = JSON.stringify(d);
+    const d = C.datiPersonali({ io: { id: 'abc123', nome: 'Roby M', colore: 2 }, sessioni: conOrologio, test: testC.map(x => ({ ...x, battito: { fine: 178, dopo: 153 } })), perSettimana: 3, profilo: { eta: 47, bpmMax: 189 } }, { tipo, dettagli }, '2026-11-16', 1e12), s = JSON.stringify(d);
     for (const k of ['orologio', 'bpm', 'bpmMedio', 'bpmMax', 'curva', 'calorie', 'eta', 'battito', 'fatica']) vero(!s.includes('"' + k + '"'), k);
     for (const v of [151, 152, 153, 177, 178, 179, 189, 333]) vero(!new RegExp('[^0-9.]' + v + '[^0-9.]').test(s), 'valore ' + v + ' nel codice');
     uguale((await C.leggiCodice(await C.creaCodice('HOMRAP1', d))).dati, d); } });
@@ -348,12 +383,27 @@ prova('famiglie di chiavi dinamiche complete', () => {
   serve('focus.', Object.keys(L.FOCUS_SCHEMA)); serve('livelli.', [1, 2, 3, 4, 5].flatMap(n => [n + '.nome', n + '.desc'])); serve('onb.', ['chi', 'sicurezza', 'obiettivi', 'esperienza', 'zone', 'disponibilita', 'attrezzatura', 'orologio'].flatMap(p => [p + '.titolo', p + '.sotto']));
   serve('prove.', [...PROVE.map(p => p.id), 'trazioni'].flatMap(p => [p + '.nome', p + '.misura', p + '.regole', p + '.consigli'])); serve('prove.', ['piegamenti.regoleFac', 'piegamenti.facilitata', 'burpees.regoleFac', 'burpees.facilitata']);
   serve('motivi.', ['facile', 'difficile', 'gentile', 'corpoLibero', 'attrezzo', 'simile']); serve('sugg.', ['aumenta', 'alleggerisci', 'mantieni', 'motivo.sopra', 'motivo.sotto', 'motivo.fatica', 'motivo.battitoAlto', 'motivo.facile']);
+  serve('prog.tend.', ['efficienza', 'piuLavoro', 'piuSforzo', 'stabile']); serve('carico.', ['titolo.salito', 'titolo.faticaAlta', 'testo.salito', 'testo.faticaAlta']); serve('prof.lingue.', ['it', 'en']); serve('risultato.', ['recuperoMeglio', 'recuperoPeggio', 'recuperoUguale']);
   serve('rep.', ['zona.1', 'zona.2', 'zona.3', 'zona.4', 'zona.5', 'maxFonte.profilo', 'maxFonte.eta', 'maxFonte.registrato', 'fonteApp', 'fonteOrologio', 'righe.giri', 'righe.mediaGiro', 'righe.calo', 'righe.bpm', 'righe.fatica']); serve('oggi.motivo.', ['scarico', 'ripartenza']);
   serve('installa.', ['fatta.testo', 'ios.testo', 'ios.passi', 'android.testo', 'android.passi', 'altro.testo', 'altro.passi']); serve('all.', ['riscaldamento', 'defaticamento', 'respiro', 'completa', 'facilitata', 'modo.app', 'modo.orologio']);
   serve('cla.', ['quale.sfida', 'quale.miglioramento', 'quale.costanza', 'desc.miglioramento', 'desc.costanza', 'mom.migliorato', 'mom.costante', 'mom.record', 'mom.serie', 'completa', 'facilitata']);
   serve('conf.frase.', ['lui', 'tu'].flatMap(c => ['sessioni', 'prova', 'giro', 'serie', 'miglioramento'].map(k => c + '.' + k))); serve('compra.', ['motivo.obiettivo', 'motivo.varieta', 'motivo.massimo', 'motivo.trazione', 'fascia.1', 'fascia.2', 'fascia.3']);
   serve('oro.guida.', ['garmin', 'apple', 'fitbit', 'generica'].flatMap(g => [g + '.impostazioni', g + '.esportare'])); serve('bak.errore.', ['formato', 'checksum', 'versione']); serve('prof.temi.', ['auto', 'scuro', 'chiaro']);
   serve('marche.', ['garmin', 'apple', 'fitbit', 'polar', 'suunto', 'coros', 'amazfit', 'samsung', 'altro']); serve('esperienza.', ['mai', 'fermo', 'regolare', 'avanzato'].flatMap(e => [e + '.nome', e + '.desc'])); serve('test.', ['iniziale', 'mensile']); serve('nav.', ['oggi', 'progressi', 'classifica', 'profilo']); });
+prova('inglese: stesse chiavi dell\'italiano, stessi segnaposto, stesse forme del plurale', () => {
+  const problemi = [], segna = s => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');
+  const confronta = (a, b, dove) => {
+    if (typeof a === 'string') { if (typeof b !== 'string') return problemi.push(dove + ': manca o non è testo');
+      if (segna(a) !== segna(b)) problemi.push(`${dove}: segnaposto diversi (${segna(a)} / ${segna(b)})`); if (a.split('|').length !== b.split('|').length) problemi.push(dove + ': forme del plurale'); if (!b.trim()) problemi.push(dove + ': vuoto'); return; }
+    if (Array.isArray(a)) { if (!Array.isArray(b) || a.length !== b.length) return problemi.push(dove + ': elenco di lunghezza diversa'); a.forEach((x, i) => confronta(x, b[i], `${dove}[${i}]`)); return; }
+    if (!b || typeof b !== 'object') return problemi.push(dove + ': manca');
+    for (const k of Object.keys(a)) confronta(a[k], b[k], dove ? dove + '.' + k : k); for (const k of Object.keys(b)) if (!(k in a)) problemi.push(`${dove}.${k}: c'è solo in inglese`); };
+  confronta(IT, EN, ''); uguale(problemi, []);
+  for (const o of L.OBIETTIVI) uguale(EN.obiettivi[o].icona, IT.obiettivi[o].icona, 'le icone non si traducono'); });
+prova('cambio lingua: testi, plurali, formato; una lingua sconosciuta torna all\'italiano', () => {
+  try { impostaLingua('en'); uguale([lingua(), locale(), t('nav.oggi'), tn('riep.giri', 1), tn('riep.giri', 3), t('esercizi.squat.nome'), t('chiave.che.non.esiste')], ['en', 'en-GB', 'Today', '1 round', '3 rounds', 'Squat', 'chiave.che.non.esiste']);
+    impostaLingua('xx'); uguale([lingua(), t('nav.oggi')], ['it', 'Oggi']); } finally { impostaLingua('it'); }
+  uguale([lingua(), locale(), t('nav.oggi')], ['it', 'it-IT', 'Oggi']); });
 prova('il service worker mette in cache tutti i file dell\'app', () => {
   const sw = readFileSync(join(radice, 'sw.js'), 'utf8'), lista = [...sw.matchAll(/'\.\/([^']+)'/g)].map(m => m[1]);
   const veri = ['index.html', 'manifest.webmanifest', ...['css', 'js', 'data', 'i18n', 'icons'].flatMap(d => elenca(join(radice, d)).map(p => relative(radice, p).split('\\').join('/')))];

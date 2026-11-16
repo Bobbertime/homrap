@@ -1,5 +1,6 @@
 // Voce, bip, vibrazione e schermo sempre acceso. Ognuno dei tre avvisi si può disattivare dalle preferenze.
 import { S } from './stato.js';
+import { locale, lingua } from './i18n.js';
 
 let ctx = null, blocco = null, vuoleAcceso = false;
 
@@ -24,8 +25,8 @@ export function parla(testo) {
   if (!S.preferenze.voce || !('speechSynthesis' in window)) return;
   try {
     const u = new SpeechSynthesisUtterance(testo);
-    u.lang = 'it-IT';
-    const voce = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith('it'));
+    u.lang = locale();
+    const voce = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith(lingua()));
     if (voce) u.voice = voce;
     u.rate = 1.05;
     speechSynthesis.cancel(); speechSynthesis.speak(u);

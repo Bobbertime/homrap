@@ -1,10 +1,11 @@
 // Scheda Progressi: record e grafico per tipo di giorno, test mensili, livelli, misure, calendario.
 import { S, salva, oggi, valutazione, testIniziale, ultimoTest } from '../stato.js';
-import { t, tn } from '../i18n.js';
+import { t, tn, locale } from '../i18n.js';
 import { registra, disegna, vai } from '../router.js';
-import { esc, ico, foglio, barre, scintilla, fmtPunti, fmtData, fmtDec, toast } from '../ui.js';
+import { esc, ico, foglio, barre, scintilla, lineaPunti, testoFrase, fmtPunti, fmtData, fmtDec, toast } from '../ui.js';
 import { giriEq, serieGiorni, miglioramento, AREE } from '../logica.js';
 import { titoloSessione } from './report.js';
+import { andamento, tendenza, bpmMassimo, caricoSettimane, avvisoCarico, recuperoBattito } from '../analisi.js';
 import { daIso, isoData, meseISO } from '../util.js';
 import { barraLivello, tabellaTest } from './test.js';
 
@@ -20,7 +21,7 @@ function calendario(d) {
     celle.push(fatti.has(iso) ? `<button class="f ${iso === d ? 'o' : ''}" data-a="giornoCal" data-v="${iso}" aria-label="${t('rep.apriDel', { data: fmtData(iso, { day: 'numeric', month: 'long' }) })}">${g}</button>` : `<span class="${iso === d ? 'o' : ''}">${g}</span>`); }
   const nel = [...fatti].filter(x => meseISO(x) === meseISO(isoData(base))).length;
   return `<div class="card col"><div class="fila tra"><button class="ico-btn due" data-a="mese" data-v="-1" aria-label="${t('prog.mesePrima')}">${ico('indietro', 18)}</button>
-    <div class="centro"><h3 style="text-transform:capitalize">${base.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}</h3><span class="pic sec">${tn('prog.allenamenti', nel)}</span></div>
+    <div class="centro"><h3 style="text-transform:capitalize">${base.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}</h3><span class="pic sec">${tn('prog.allenamenti', nel)}</span></div>
     <button class="ico-btn due" data-a="mese" data-v="1" aria-label="${t('prog.meseDopo')}" ${meseOff >= 0 ? 'disabled' : ''}>${ico('avanti', 18)}</button></div>
     <div class="calendario">${t('comune.giorniBrevi').map(g => `<span class="forte">${g}</span>`).join('')}${celle.join('')}</div></div>`;
 }
@@ -49,6 +50,23 @@ registra('progressi', () => {
       <div class="card col stretti"><h3>${t('prog.testNelTempo')}</h3>${S.test.slice(1).map(x => { const m = miglioramento(iniz.ris, x.ris); return `<div class="stat"><span>${fmtData(x.data, { day: 'numeric', month: 'long', year: 'numeric' })}</span><span class="num ${m > 0 ? 'art' : ''}">${m > 0 ? '+' : ''}${m}%</span></div>`; }).join('')}</div>`;
   } else if (ult) sezTest = `<h2>${t('prog.test')}</h2><div class="card avviso"><span class="tondo">${ico('bersaglio')}</span><p class="pic sec">${t('prog.unSoloTest')}</p></div>`;
 
+  // Battito di recupero misurato nei test (facoltativo)
+  const recuperi = S.test.map(x => ({ x, r: recuperoBattito(x) })).filter(o => o.r);
+  if (recuperi.length) sezTest += `<div class="card col stretti"><h3>${t('prog.recupero')}</h3>${recuperi.map(({ x, r }) => `<div class="stat"><span>${fmtData(x.data, { day: 'numeric', month: 'long', year: 'numeric' })}</span><span class="num">−${r.calo} bpm</span></div>`).join('')}<span class="pic sec">${t('prog.recuperoNota')}</span></div>`;
+
+  // Andamento del tipo di giorno scelto: battito medio e calo finale, un grafico per misura
+  const punti = andamento(S.sessioni, tipoSel, bpmMassimo(S.profilo || {}, S.sessioni).valore), tend = tendenza(punti);
+  const gBpm = lineaPunti(punti.map(p => p.bpm), { etichetta: t('prog.andBpm') }), gCalo = lineaPunti(punti.map(p => (p.calo == null ? null : Math.round(p.calo * 100))), { fmt: v => (v > 0 ? '+' : '') + v + '%', etichetta: t('prog.andCalo') });
+  const sezAndamento = gBpm || gCalo ? `<div class="card col"><div class="fila tra"><h3>${t('prog.andamento', { tipo: tipoSel })}</h3><span class="pic sec">${fmtData(punti[0].data)} → ${fmtData(punti[punti.length - 1].data)}</span></div>
+      ${gBpm ? `<div><span class="pic forte sec">${t('prog.andBpm')}</span>${gBpm}</div>` : ''}${gCalo ? `<div><span class="pic forte sec">${t('prog.andCalo')}</span>${gCalo}</div>` : ''}
+      ${tend ? `<p class="pic">${esc(t('prog.tend.' + tend.k, { ...tend.par, giri: fmtDec(tend.par.giri) }))}</p>` : ''}<span class="pic sec">${t('prog.andNota')}</span></div>` : '';
+
+  // Carico delle ultime 6 settimane
+  const sett = caricoSettimane(S.sessioni, d, 6), avv = avvisoCarico(S.sessioni, d);
+  const sezCarico = sett.some(w => w.carico) ? `<div class="card col"><div class="fila tra"><h3>${t('prog.carico')}</h3><span class="pic sec">${t('prog.caricoUnita')}</span></div>
+      ${barre(sett.map(w => ({ v: w.carico, testo: String(w.carico), sotto: fmtData(w.lunedi, { day: 'numeric', month: 'numeric' }) })), { etichetta: t('prog.carico') })}
+      ${avv ? `<p class="pic forte">${esc(t('carico.testo.' + avv.k, avv.par))}</p>` : ''}<span class="pic sec">${t('prog.caricoNota')}</span></div>` : '';
+
   // Misure
   const mis = S.misure, ultM = mis[mis.length - 1];
   const sezMisure = `<div class="fila tra"><h2 style="margin:0">${t('prog.misure')}</h2><button class="btn piccolo" data-a="misura">${ico('piu', 18)}${t('prog.aggiungi')}</button></div>
@@ -67,7 +85,9 @@ registra('progressi', () => {
         ${barre(ultime.map(s => ({ v: giriEq(s), testo: fmtDec(giriEq(s)), sotto: fmtData(s.data, { day: 'numeric', month: 'numeric' }), leggero: s.fattore < 1 || s.interrotta, id: s.id,
           aria: t('rep.apriDel', { data: fmtData(s.data, { day: 'numeric', month: 'long' }) }) })), { etichetta: t('prog.giriEq'), azione: 'report' })}
         <span class="pic sec">${t('rep.toccaBarra')}${ultime.some(s => s.fattore < 1 || s.interrotta) ? ' ' + t('prog.legendaLeggere') : ''}</span></div>` : ''}
+      ${sezAndamento}
       <div class="griglia3">${[[S.sessioni.filter(s => s.tipo !== 'test').length, t('prog.sessioni')], [totGiri, t('prog.giriTotali')], [serie, t('prog.serie')]].map(([n, l]) => `<div class="card centro" style="padding:12px 8px"><div class="medio">${n}</div><span class="pic sec">${l}</span></div>`).join('')}</div>
+      ${sezCarico}
       ${sezTest}
       ${v ? `<h2>${t('prog.livelli')}</h2><div class="card col"><div class="fila tra"><span class="forte">${t('prog.livelloGlobale')}</span><span class="pill ar">${t('risultato.liv', { n: v.globale })} · ${t('livelli.' + v.globale + '.nome')}</span></div>
         ${AREE.map(a => `<div class="col stretti"><div class="fila tra pic"><span style="font-weight:600">${t('aree.' + a)}</span><span class="num" style="font-size:16px">${v.aree[a].liv}/5</span></div>${barraLivello(v.aree[a])}</div>`).join('')}</div>` : ''}

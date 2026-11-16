@@ -1,9 +1,13 @@
 // Traduzioni: tutte le stringhe stanno in i18n/<lingua>.js. Per aggiungere una lingua vedi il README.
 import { IT } from '../i18n/it.js';
+import { EN } from '../i18n/en.js';
 
-const LINGUE = { it: IT };
-let corrente = LINGUE.it;
-export function impostaLingua(codice) { corrente = LINGUE[codice] || LINGUE.it; }
+export const LINGUE = { it: IT, en: EN };
+const LOCALI = { it: 'it-IT', en: 'en-GB' };     // formato di date e numeri, e voce degli avvisi
+let codice = 'it', corrente = LINGUE.it;
+export function impostaLingua(c) { codice = LINGUE[c] ? c : 'it'; corrente = LINGUE[codice]; }
+export const lingua = () => codice;
+export const locale = () => LOCALI[codice];
 
 // t('oggi.ciao', { nome: 'Ada' }) → cerca la chiave puntata e sostituisce {nome}.
 export function t(chiave, par) {

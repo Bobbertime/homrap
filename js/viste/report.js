@@ -1,10 +1,10 @@
 // Report di una sessione (#/report/<id>): curva del battito, tempo di ogni giro, zone di sforzo,
 // confronto con la sessione precedente dello stesso tipo di giorno e frasi di lettura.
 // I calcoli stanno in js/analisi.js; qui c'è solo il disegno. Funziona anche senza orologio, con i tempi dei giri dell'app.
-import { S } from '../stato.js';
-import { t, tn } from '../i18n.js';
-import { registra, vai, indietro } from '../router.js';
-import { esc, ico, foglio, fmtPunti, fmtData, fmtDec, condividiFile, testoFrase } from '../ui.js';
+import { S, salvaSessione, eliminaSessione } from '../stato.js';
+import { t, tn, nomeEsercizio } from '../i18n.js';
+import { registra, vai, indietro, disegna } from '../router.js';
+import { esc, ico, foglio, toast, conferma, fmtPunti, fmtData, fmtDec, condividiFile, testoFrase } from '../ui.js';
 import { analizza, CONFINI_ZONE } from '../analisi.js';
 import { mmss } from '../util.js';
 import { immagineReport } from '../immagini.js';
@@ -47,15 +47,14 @@ function graficoCurva(c, a) {
 // ── Tempo di ogni giro: un punto per giro unito da una linea; più in alto = giro più lento, così il calo finale
 // si vede come una salita. La scala parte dal giro più veloce (non da zero), la riga tratteggiata è la media.
 function graficoGiri(g, bpmGiri) {
-  const W = 320, conBpm = !!bpmGiri, H = conBpm ? 172 : 158, sx = 16, dx = 16, su = 26, giu = conBpm ? 44 : 30;
+  const W = 320, conBpm = !!bpmGiri, H = conBpm ? 172 : 158, sx = 22, dx = 22, su = 26, giu = conBpm ? 44 : 30;
   const margine = Math.max(4, (g.max - g.min) * 0.18), lo = g.min - margine, hi = g.max + margine;
   const X = i => (g.n === 1 ? W / 2 : sx + i * (W - sx - dx) / (g.n - 1)), Y = v => su + (hi - v) / (hi - lo) * (H - su - giu);
   const tanti = g.n > 8, mostra = i => !tanti || i === 0 || i === g.n - 1 || i === g.iMin || i === g.iMax;
-  const ancora = i => (i === 0 ? 'start' : i === g.n - 1 ? 'end' : 'middle'), tx = i => (i === 0 ? X(i) - 6 : i === g.n - 1 ? X(i) + 6 : X(i));
   return `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('rep.tempiGiroAria', { n: g.n, veloce: mmss(g.min), lento: mmss(g.max) }))}">
-    <line x1="${sx - 6}" x2="${W - dx + 6}" y1="${Y(g.media).toFixed(1)}" y2="${Y(g.media).toFixed(1)}" class="gg"/>
+    <line x1="${sx - 12}" x2="${W - dx + 12}" y1="${Y(g.media).toFixed(1)}" y2="${Y(g.media).toFixed(1)}" class="gg"/>
     <polyline points="${g.tempi.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')}" class="gl tenue"/>
-    ${g.tempi.map((v, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="5" class="${i === g.iMin ? 'gp' : 'gp neutro'}"/>${mostra(i) ? `<text x="${tx(i).toFixed(1)}" y="${(Y(v) - 10).toFixed(1)}" text-anchor="${ancora(i)}" class="gv">${mmss(v)}</text>` : ''}
+    ${g.tempi.map((v, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="5" class="${i === g.iMin ? 'gp' : 'gp neutro'}"/>${mostra(i) ? `<text x="${X(i).toFixed(1)}" y="${(Y(v) - 10).toFixed(1)}" text-anchor="middle" class="gv">${mmss(v)}</text>` : ''}
       <text x="${X(i).toFixed(1)}" y="${H - giu + 20}" text-anchor="middle" class="ge">${i + 1}</text>${conBpm && bpmGiri.bpm[i] != null ? `<text x="${X(i).toFixed(1)}" y="${H - giu + 34}" text-anchor="middle" class="ge forte">${bpmGiri.bpm[i]}</text>` : ''}`).join('')}
   </svg>`;
 }
@@ -118,9 +117,33 @@ registra('report', ([id]) => {
         ${cf ? `${tabellaConfronto(s, cf)}${cf.circuitoDiverso ? `<p class="pic sec">${t('rep.circuitoDiverso')}</p>` : ''}<a class="btn piccolo" href="#/report/${cf.id}" style="align-self:flex-start">${t('rep.apriPrecedente')}</a>` : `<p class="pic sec">${t('rep.primaVolta')}</p>`}</div>
       ${c && c.curva ? '' : `<div class="card avviso"><span class="tondo">${ico('orologio')}</span><div class="col stretti cresce"><h3>${t('rep.aggiungiOrologio')}</h3><p class="pic sec">${t('rep.aggiungiOrologioTesto')}</p>
         <a class="btn piccolo" href="#/orologi" style="align-self:flex-start;margin-top:4px">${t('oro.importa')}</a></div></div>`}
-      <button class="btn primario largo" data-a="condividi">${ico('condividi')}${t('rep.condividi')}</button></main>`,
+      ${s.note || (s.fastidi || []).length ? `<div class="card col stretti"><h3>${t('rep.note')}</h3>${s.note ? `<p style="white-space:pre-wrap">${esc(s.note)}</p>` : ''}
+        ${(s.fastidi || []).length ? `<p class="pic sec">${t('rep.fastidi', { nomi: s.fastidi.map(nomeEsercizio).join(', ') })}</p>` : ''}</div>` : ''}
+      <button class="btn primario largo" data-a="condividi">${ico('condividi')}${t('rep.condividi')}</button>
+      <div class="fila stretti"><button class="btn cresce" data-a="correggi">${ico('matita', 18)}${t('rep.correggi')}</button><button class="btn pericolo" data-a="elimina">${ico('cestino', 18)}${t('rep.elimina')}</button></div></main>`,
     azioni: {
       indietro: () => indietro('progressi'),
+      // Correzione dopo il salvataggio: giri, ripetizioni dell'ultimo giro, fatica e note. I tempi dei giri e i dati dell'orologio non si toccano.
+      correggi: () => {
+        foglio(`<h2 style="margin:0">${t('rep.correggi')}</h2><p class="pic sec">${t('rep.correggiTesto')}</p>
+          <div class="griglia2"><label class="campo">${t('fine.giri')}<input type="number" inputmode="numeric" min="0" max="99" data-k="giri" value="${s.giri}"></label>
+            <label class="campo">${t('rep.extra')}<input type="number" inputmode="numeric" min="0" data-k="extra" value="${s.extra || 0}"></label></div>
+          <label class="campo">${t('fine.fatica')}<input type="number" inputmode="numeric" min="1" max="10" data-k="fatica" value="${s.fatica != null ? s.fatica : ''}"></label>
+          <label class="campo">${t('fine.note')}<textarea data-k="note">${esc(s.note || '')}</textarea></label>
+          <button class="btn primario largo" data-a="ok">${t('comune.salva')}</button><button class="btn largo" data-a="chiudi">${t('comune.annulla')}</button>`,
+        { ok: async (b, ev, chiudi, velo) => {
+          const val = k => velo.querySelector(`[data-k="${k}"]`).value, giri = Number(val('giri')), extra = Number(val('extra') || 0), fatica = val('fatica') === '' ? null : Number(val('fatica'));
+          const intero = (n, lo, hi) => Number.isInteger(n) && n >= lo && n <= hi;
+          if (!intero(giri, 0, 99) || !intero(extra, 0, s.ripGiro ? s.ripGiro - 1 : 999) || (fatica != null && !intero(fatica, 1, 10))) return toast(t('rep.correggiErrore', { max: s.ripGiro ? s.ripGiro - 1 : 999 }));
+          if (extra !== (s.extra || 0)) delete s.extraPer;
+          Object.assign(s, { giri, extra, note: val('note').trim(), corretta: true }); if (fatica != null) s.fatica = fatica;
+          await salvaSessione(s); chiudi(); toast(t('comune.salvato')); disegna();
+        } });
+      },
+      elimina: async () => {
+        if (!(await conferma(t('rep.eliminaTitolo'), t('rep.eliminaTesto'), t('rep.eliminaOk')))) return;
+        await eliminaSessione(s.id); toast(t('rep.eliminata')); indietro('progressi');
+      },
       condividi: () => {
         const invia = async conBattito => {
           const blob = await immagineReport(s, a, { titolo: titoloSessione(s), conBattito });

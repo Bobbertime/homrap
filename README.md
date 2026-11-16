@@ -30,10 +30,10 @@ Il file vuoto `.nojekyll` dice a GitHub di pubblicare i file così come sono: la
 Dopo ogni modifica ai file, apri `sw.js` e cambia la riga
 
 ```js
-const VERSIONE = 'homrap-1.0.3';
+const VERSIONE = 'homrap-1.0.4';
 ```
 
-per esempio in `homrap-1.0.4` (e, se vuoi che si veda in fondo al Profilo, anche `VERSIONE` in `js/viste/profilo.js`). Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
+per esempio in `homrap-1.0.5` (e, se vuoi che si veda in fondo al Profilo, anche `VERSIONE` in `js/viste/profilo.js`). Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
 
 ### Provarla sul computer
 
@@ -60,6 +60,7 @@ data/esercizi.js        libreria esercizi (numeri e regole, senza testi)
 data/attrezzi.js        inventario degli attrezzi e fasce di prezzo
 data/soglie-test.js     prove del test e soglie dei livelli, per età e sesso
 i18n/it.js              tutte le stringhe in italiano
+i18n/en.js              le stesse stringhe in inglese
 
 js/app.js               avvio
 js/router.js            navigazione a hash (#/oggi, #/progressi …) e posizione salvata tornando indietro
@@ -67,7 +68,7 @@ js/stato.js             stato in memoria e salvataggio
 js/db.js                piccolo wrapper su IndexedDB
 js/backup.js            backup, checksum, versione dello schema e migrazioni
 js/logica.js            logica di allenamento: livelli, scelta esercizi, ripetizioni, piano, progressione, acquisti
-js/analisi.js           analisi di una sessione per il Report: battito massimo, zone, giri, confronto, frasi di lettura
+js/analisi.js           analisi per Report e Progressi: battito massimo, zone, giri, confronto, frasi, andamento, carico settimanale
 js/classifica.js        sfida del mese, codici personali e di gruppo, classifiche, frasi del confronto
 js/orologi.js           decoder FIT scritto a mano, lettura di TCX e GPX
 js/immagini.js          immagini 1080×1920 da condividere (canvas)
@@ -90,7 +91,7 @@ tests/run.mjs           test automatici della logica
 node tests/run.mjs
 ```
 
-Serve Node 18 o successivo. Sono 91 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione (anche con il battito), analisi della sessione per il Report (battito massimo, zone, giri, confronto, frasi), posizione salvata tornando indietro, link dei video, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato, niente battito né età), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni.
+Serve Node 18 o successivo. Sono 98 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione (anche con il battito), analisi della sessione per il Report (battito massimo, zone, giri, confronto, frasi), posizione salvata tornando indietro, link dei video, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato, niente battito né età), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni, inglese con le stesse chiavi dell'italiano, manubrio singolo e kettlebell, andamento, carico della settimana e battito di recupero.
 
 ---
 
@@ -137,12 +138,14 @@ Metti il file (GIF, WebP o SVG animato) in una cartella, per esempio `anim/squat
 
 ### Una lingua
 
-1. Copia `i18n/it.js` in `i18n/en.js`, rinomina `IT` in `EN` e traduci i valori. Le chiavi restano uguali. I plurali sono scritti `"singolare|plurale"`.
-2. In `js/i18n.js` importa il file e aggiungilo a `LINGUE`: `const LINGUE = { it: IT, en: EN };`.
-3. Chiama `impostaLingua('en')` all'avvio (in `js/app.js`), oppure aggiungi una scelta nel Profilo.
-4. Aggiungi `./i18n/en.js` all'elenco `FILE` di `sw.js`.
+L'app ha due lingue, italiano e inglese; si sceglie in Profilo → Impostazioni, oppure dal pulsante in alto nella schermata di benvenuto. Per aggiungerne una terza:
 
-Le chiavi mancanti ricadono sull'italiano.
+1. Copia `i18n/it.js` in un file nuovo, per esempio `i18n/es.js`, rinomina `IT` in `ES` e traduci i valori. Le chiavi restano uguali. I plurali sono scritti `"singolare|plurale"`.
+2. In `js/i18n.js` importa il file, aggiungilo a `LINGUE` (`{ it: IT, en: EN, es: ES }`) e a `LOCALI` (`es: 'es-ES'`, che decide il formato di date e numeri e la voce).
+3. Aggiungi il nome della lingua alla voce `prof.lingue` di tutti i file di traduzione: il pulsante nel Profilo compare da solo.
+4. Aggiungi `./i18n/es.js` all'elenco `FILE` di `sw.js`.
+
+Le chiavi mancanti ricadono sull'italiano. Un test controlla che l'inglese abbia le stesse chiavi, gli stessi segnaposto `{…}` e le stesse forme del plurale dell'italiano: se aggiungi un testo in `it.js`, aggiungilo anche in `en.js`.
 
 ### Soglie del test
 
@@ -236,6 +239,17 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - Il campo `video` degli esercizi è vuoto per tutti: non sono stati inventati link. Un link che non è un indirizzo `https` di YouTube viene ignorato.
 - Posizione salvata: ogni pagina aperta riceve un numero nella cronologia del browser. Tornando indietro (freccia dell'app, tasto indietro di Android, gesto di iOS) la pagina riparte da dove era; aprendo una pagina nuova, o andando avanti con il browser, si parte dall'alto. Le frecce "indietro" delle intestazioni tornano davvero indietro nella cronologia quando la pagina precedente è quella attesa; altrimenti aprono la pagina madre dall'alto. Anche "Salva" in una voce del Profilo riporta al Profilo nel punto in cui era (tranne quando la modifica richiede di rivedere il piano). Le posizioni restano in memoria finché l'app è aperta, e sopravvivono a una ricarica.
 
+**Versione 1.0.4**
+
+- *Un solo manubrio.* In Attrezzatura, sotto i kg dei manubri, c'è l'interruttore "Ho un solo manubrio". Non viene trattato come una kettlebell (lo swing con un manubrio è un altro movimento). Gli esercizi che vogliono due manubri hanno il campo `paio: true` in `data/esercizi.js` (distensioni a terra e lento avanti) e non vengono proposti a chi ne ha uno; al loro posto ci sono due esercizi nuovi a un braccio, con le ripetizioni per lato, disponibili anche a chi ha due manubri. Rematore, goblet squat e stacco rumeno (un peso tenuto con due mani) restano.
+- *Kettlebell.* Prima serviva a due soli esercizi, ora a sei: goblet squat, swing, rematore a un braccio, stacco rumeno e le due spinte a un braccio. In "Cosa comprare dopo" il punteggio conta una volta sola la versione a due manubri e quella a un braccio, e la kettlebell riceve un bonus più basso per la trazione, così per chi non ha attrezzi il primo consiglio per la trazione resta sbarra o elastici.
+- *Note e fastidi nel report.* Le note scritte a fine allenamento e gli esercizi segnalati compaiono in fondo al report.
+- *Correggere o cancellare una sessione.* Dal report: "Correggi i dati" cambia giri, ripetizioni dopo l'ultimo giro, fatica e note; i tempi dei giri e i dati dell'orologio non si toccano. "Elimina" chiede conferma e toglie la sessione da progressi, record, progressione e classifica. Non c'è un cestino: una sessione eliminata si recupera solo da un backup.
+- *Andamento in Progressi.* Per il tipo di giorno scelto, due grafici separati (battito medio e calo finale) sulle ultime 8 sessioni complete e a ripetizioni piene, e una frase che confronta la prima e la seconda metà delle sessioni con il battito: ne servono almeno 4; contano differenze di almeno 3 bpm e 0,25 giri.
+- *Carico della settimana.* Carico = minuti di allenamento × fatica segnata (5 se manca; per una sessione interrotta i minuti davvero fatti). In Progressi le ultime 6 settimane. L'avviso, in Oggi e in Progressi, scatta in due casi: la settimana in corso è già almeno il 30% sopra la media delle 3 precedenti (con almeno 2 sessioni questa settimana e 2 settimane di confronto), oppure le ultime 3 sessioni hanno tutte fatica da 8 in su. È solo un avviso: non cambia il piano. "Ho capito" lo nasconde fino alla settimana dopo. Le soglie sono in `js/analisi.js` (`SOGLIE_CARICO`).
+- *Battito di recupero nel test.* Facoltativo: nel recupero dopo i burpees si possono scrivere il battito appena finita la prova e quello dopo un minuto (quando il timer segna 0:30; se hai compilato il primo, la voce te lo ricorda). L'app mostra di quanto è sceso e lo confronta con il test precedente, senza dare giudizi "buono/scarso": le soglie di riferimento sono cliniche e non adatte a un'app. Non cambia i livelli e non entra nei codici della classifica.
+- *Inglese.* Tutta l'app è tradotta, compresi i testi degli esercizi e gli avvisi vocali. La lingua predefinita resta l'italiano, anche su un telefono in inglese. In inglese date e numeri usano il formato britannico e la ricerca del video usa il nome inglese dell'esercizio più "proper form".
+
 **Orologio**
 
 - Nel file dell'orologio l'ultimo lap, quello chiuso dallo stop, è considerato il giro incompleto: i giri sono i lap meno uno.
@@ -256,6 +270,10 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 
 ## 6. Limiti noti
 
+- **Novità della 1.0.4** (manubrio singolo, correzione ed eliminazione delle sessioni, andamento, carico, battito di recupero, inglese): provate con i test automatici e in Chrome senza interfaccia a 390 px, tema scuro e chiaro. Non provate su telefoni veri.
+- **Inglese:** la traduzione non è stata riletta da un madrelingua. Gli avvisi vocali in inglese dipendono dalle voci installate sul telefono.
+- **Battito di recupero:** va letto dall'orologio e scritto a mano durante il recupero, quindi dipende da quanto sei puntuale nel guardarlo.
+- **Carico della settimana:** conta solo gli allenamenti fatti nell'app; la fatica è quella che segni tu.
 - **Report, suggerimenti con il battito, video e ritorno indietro (1.0.3):** provati con i test automatici e in Chrome senza interfaccia a 390 px, tema scuro e chiaro, con i dati della demo e un file TCX generato apposta. Non sono stati provati su telefoni veri né con file veri degli orologi.
 - **Battito massimo e zone:** la stima dall'età può sbagliare di una decina di battiti, quindi zone e soglie dei suggerimenti sono indicative finché non scrivi il tuo massimo nel profilo. La curva salvata ha al massimo 120 punti: su 20 minuti il tempo in zona è preciso a circa 10 secondi. Non è una valutazione medica.
 - **Giri dell'app e curva dell'orologio:** il battito per giro è giusto solo se telefono e orologio hanno l'ora sincronizzata. Se le due ore di inizio distano più di 15 minuti, o se il file non ha l'ora, la curva viene considerata partita insieme all'AMRAP.
@@ -269,7 +287,7 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - **Decoder FIT:** legge i messaggi session, lap e record (tempo, battito, calorie). È stato provato con file generati dai test, non con file veri di ogni marca: se un file non viene letto, c'è sempre l'inserimento manuale.
 - **Soglie dei livelli:** sono valori ragionevoli, non uno standard scientifico. Si ritoccano in `data/soglie-test.js`.
 - **Sagoma dei muscoli:** è volutamente schematica. Non ci sono animazioni (la struttura per aggiungerle è pronta).
-- **Un solo profilo per telefono** e una sola lingua, come da progetto.
+- **Un solo profilo per telefono**, come da progetto.
 
 ---
 

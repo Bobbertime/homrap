@@ -2,7 +2,8 @@
 import { S, salva, contesto, backupCorrente, oggi } from './stato.js';
 import { scegli, sostituisci } from './logica.js';
 import { PER_ID } from '../data/esercizi.js';
-import { condividiFile } from './ui.js';
+import { condividiFile, ico } from './ui.js';
+import { t, impostaLingua, lingua } from './i18n.js';
 
 function rimpiazza(id, con) {
   if (!S.piano) return;
@@ -34,7 +35,18 @@ export async function salvaBackup() {
   await salva('backup');
   return true;
 }
+// Lingua scelta nel Profilo: testi, formato di date e numeri, voce. Ridisegna anche la barra in basso.
+export function applicaLingua() {
+  impostaLingua(S.preferenze.lingua || 'it');
+  document.documentElement.lang = lingua();
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  nav.innerHTML = [['oggi', 'casa'], ['progressi', 'grafico'], ['classifica', 'coppa'], ['profilo', 'persona']].map(([nome, icona]) => `<a href="#/${nome}">${ico(icona)}${t('nav.' + nome)}</a>`).join('');
+  nav.setAttribute('aria-label', t('nav.aria'));
+}
+// Tema e lingua si applicano insieme: viene chiamata all'avvio e dopo ogni ripristino, demo o cancellazione dei dati.
 export function applicaTema() {
+  applicaLingua();
   const scelto = S.preferenze.tema || 'auto';
   const chiaro = scelto === 'chiaro' || (scelto === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
   document.documentElement.dataset.tema = chiaro ? 'chiaro' : 'scuro';

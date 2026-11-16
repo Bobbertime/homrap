@@ -1,5 +1,5 @@
 // Mattoncini dell'interfaccia: icone, fogli, avvisi, grafici, sagoma dei muscoli, condivisione.
-import { t } from './i18n.js';
+import { t, locale } from './i18n.js';
 import { PER_ID } from '../data/esercizi.js';
 import { mmss } from './util.js';
 
@@ -54,8 +54,8 @@ export function fmtQ(id, q) {
   return (e.unita === 'sec' ? q + '"' : String(q)) + (e.lato ? t('comune.perLato') : '');
 }
 export const fmtPunti = (giri, extra) => extra ? `${giri} + ${extra}` : String(giri);
-export const fmtData = (iso, opz = { day: 'numeric', month: 'short' }) => new Date(iso.length > 10 ? iso : iso + 'T12:00:00').toLocaleDateString('it-IT', opz);
-export const fmtDec = (n, d = 1) => Number(n).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
+export const fmtData = (iso, opz = { day: 'numeric', month: 'short' }) => new Date(iso.length > 10 ? iso : iso + 'T12:00:00').toLocaleDateString(locale(), opz);
+export const fmtDec = (n, d = 1) => Number(n).toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 
 // Frase di lettura del report: { k, par } (da js/analisi.js) → testo, con date e numeri scritti all'italiana.
 export function testoFrase(f) {
@@ -128,6 +128,21 @@ export function dueLinee(a, b, etichetta = '') {
   const lo = Math.min(...tutti), hi = Math.max(...tutti), w = 320, h = 120;
   const linea = (v, c, tr) => v.length > 1 ? `<polyline points="${punti(v, w, h, lo, hi, 8)}" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" ${tr ? 'stroke-dasharray="2 7"' : ''}/>` : '';
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" role="img" aria-label="${esc(etichetta)}">${linea(b, 'var(--txt2)', true)}${linea(a, 'var(--ar)')}</svg>`;
+}
+
+// Linea a punti per un andamento: valori allineati alle sessioni (null = dato mancante), con primo e ultimo valore scritti.
+export function lineaPunti(valori, { fmt = String, etichetta = '' } = {}) {
+  const con = valori.map((v, i) => ({ v, i })).filter(p => p.v != null);
+  if (con.length < 2) return '';
+  const W = 320, H = 86, sx = 14, dx = 14, su = 24, giu = 12, n = valori.length, vs = con.map(p => p.v);
+  const lo = Math.min(...vs), hi = Math.max(...vs), margine = (hi - lo) * 0.15 || 1;
+  const X = i => (n === 1 ? W / 2 : sx + i * (W - sx - dx) / (n - 1)), Y = v => su + (hi + margine - v) / (hi - lo + 2 * margine) * (H - su - giu);
+  const primo = con[0], ultimo = con[con.length - 1];
+  return `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(etichetta)}">
+    <polyline points="${con.map(p => `${X(p.i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ')}" class="gl tenue"/>
+    ${con.map(p => `<circle cx="${X(p.i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="4.500" class="${p === ultimo ? 'gp' : 'gp neutro'}"/>`).join('')}
+    <text x="${(X(primo.i) - 5).toFixed(1)}" y="${(Y(primo.v) - 9).toFixed(1)}" class="gv">${esc(fmt(primo.v))}</text>
+    <text x="${(X(ultimo.i) + 5).toFixed(1)}" y="${(Y(ultimo.v) - 9).toFixed(1)}" text-anchor="end" class="gv">${esc(fmt(ultimo.v))}</text></svg>`;
 }
 
 // ── Sagoma del corpo, fronte e retro: un solo SVG per tutti gli esercizi. Ogni muscolo: rettangoli [dx, y, larghezza, altezza, raggio].

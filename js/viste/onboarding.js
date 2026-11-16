@@ -1,6 +1,6 @@
 // Benvenuto, installazione guidata e onboarding in 8 passi. Gli stessi passi servono per le modifiche dal Profilo.
 import { S, salva } from '../stato.js';
-import { t, tn } from '../i18n.js';
+import { t, tn, lingua } from '../i18n.js';
 import { registra, vai, disegna, indietro } from '../router.js';
 import { esc, ico, toast, interruttore, intestazione } from '../ui.js';
 import { OBIETTIVI, GIORNI_PREDEFINITI } from '../logica.js';
@@ -9,6 +9,7 @@ import { ZONE } from '../../data/esercizi.js';
 import { copia } from '../util.js';
 import { eIOS, eAndroid, installata, puoInstallare, installa, chiediPersistenza } from '../piattaforma.js';
 import { ripristinaDaFile } from './profilo.js';
+import { applicaTema } from '../azioni.js';
 
 const MARCHE = ['garmin', 'apple', 'fitbit', 'polar', 'suunto', 'coros', 'amazfit', 'samsung', 'altro'];
 const ESPERIENZE = ['mai', 'fermo', 'regolare', 'avanzato'];
@@ -76,7 +77,8 @@ const PASSI = [
     html: ({ attrezzi: a }) => `
       <button class="tessera bassa" data-a="soloCorpo" aria-pressed="${!Object.keys(a).length}"><span>${t('onb.att.soloCorpo')}</span><small>${t('onb.att.soloCorpoDesc')}</small></button>
       ${ATTREZZI.map(x => `<div class="card col stretti"><div class="fila tra"><span class="forte">${t('attrezzi.' + x.id)}</span>${interruttore('att', !!a[x.id], t('attrezzi.' + x.id), `data-v="${x.id}"`)}</div>
-        ${x.conKg && a[x.id] ? `<label class="campo">${t('onb.att.kg')}<input data-i="kg" data-v="${x.id}" inputmode="decimal" placeholder="${t('onb.att.kgEsempio')}" value="${esc((a[x.id].kg || []).join(', '))}"></label>` : ''}</div>`).join('')}`,
+        ${x.conKg && a[x.id] ? `<label class="campo">${t('onb.att.kg')}<input data-i="kg" data-v="${x.id}" inputmode="decimal" placeholder="${t('onb.att.kgEsempio')}" value="${esc((a[x.id].kg || []).join(', '))}"></label>` : ''}
+        ${x.id === 'manubri' && a.manubri ? `<div class="fila tra"><div class="col stretti"><span style="font-weight:600">${t('onb.att.unoSolo')}</span><span class="pic sec">${t('onb.att.unoSoloDesc')}</span></div>${interruttore('unoSolo', !!a.manubri.singolo, t('onb.att.unoSolo'))}</div>` : ''}</div>`).join('')}`,
     valido: () => true },
   { id: 'orologio',
     html: ({ orologio: o }) => `
@@ -111,7 +113,8 @@ const AZIONI = {
   att: el => { const id = el.dataset.v, x = ATTREZZI.find(a => a.id === id);
     if (B.attrezzi[id]) delete B.attrezzi[id]; else B.attrezzi[id] = x.conKg ? { kg: [] } : true;
     disegna(); },
-  kg: el => { B.attrezzi[el.dataset.v] = { kg: [...new Set((el.value.match(/\d+([.,]\d+)?/g) || []).map(n => parseFloat(n.replace(',', '.'))).filter(n => n > 0 && n < 100))].sort((a, b) => a - b) }; },
+  kg: el => { B.attrezzi[el.dataset.v] = { ...B.attrezzi[el.dataset.v], kg: [...new Set((el.value.match(/\d+([.,]\d+)?/g) || []).map(n => parseFloat(n.replace(',', '.'))).filter(n => n > 0 && n < 100))].sort((a, b) => a - b) }; },
+  unoSolo: () => { const m = B.attrezzi.manubri; if (m.singolo) delete m.singolo; else m.singolo = true; disegna(); },
   marca: el => { B.orologio.marca = el.dataset.v || null; if (!B.orologio.marca) B.orologio.usa = false; disegna(); },
   modello: el => { B.orologio.modello = el.value; },
   usaOro: () => { B.orologio.usa = !B.orologio.usa; disegna(); },
@@ -129,6 +132,7 @@ async function salvaBozza() {
 
 registra('benvenuto', () => ({
   html: `<main class="pagina piena" style="justify-content:center">
+    <button class="btn piccolo" data-a="lingua" style="align-self:flex-end">${t('benvenuto.altraLingua')}</button>
     <div class="col" style="align-items:flex-start;gap:14px">${LOGO(72)}<h1 style="font-size:44px">HoMRAP</h1>
       <p class="art forte" style="font-size:20px">${t('benvenuto.motto')}</p><p class="sec">${t('benvenuto.testo')}</p></div>
     <div class="card avviso"><span class="tondo">${ico('scudo')}</span><p class="pic">${t('benvenuto.avviso')}</p></div>
@@ -136,7 +140,8 @@ registra('benvenuto', () => ({
     <div class="spazio"></div>
     <a class="btn primario largo" href="#/installa">${t('benvenuto.inizia')}</a>
     <label class="btn testo largo" style="cursor:pointer">${t('benvenuto.ripristina')}<input type="file" accept=".json,application/json" hidden data-c="ripristina"></label></main>`,
-  azioni: { ripristina: el => ripristinaDaFile(el.files[0], () => vai('oggi')) },
+  azioni: { ripristina: el => ripristinaDaFile(el.files[0], () => vai('oggi')),
+    lingua: async () => { S.preferenze.lingua = lingua() === 'it' ? 'en' : 'it'; await salva('preferenze'); applicaTema(); disegna(); } },
 }));
 
 registra('installa', () => {

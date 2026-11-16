@@ -10,7 +10,7 @@ const PREDEFINITI = () => ({
   attrezzi: {},            // { elastici: true, manubri: { kg: [4, 8] }, … }
   orologio: null,          // { marca, modello, usa }
   piano: null,
-  preferenze: { tema: 'auto', voce: true, suoni: true, vibrazione: true, noSalti: false },
+  preferenze: { tema: 'auto', lingua: 'it', voce: true, suoni: true, vibrazione: true, noSalti: false },
   esercizi: { scartati: [], daDecidere: [], sostituzioni: {}, tempi: {} },
   classifica: { membri: {}, codici: {}, gruppo: null, periodo: 'm' },
   backup: { ultimo: null, daRicordare: false },
@@ -46,6 +46,10 @@ export async function salvaSessione(s) {
   if (i >= 0) S.sessioni[i] = s; else S.sessioni.push(s);
   S.sessioni.sort((a, b) => a.ts - b.ts);
   await db.scrivi('sessioni', copia(s));
+}
+export async function eliminaSessione(id) {
+  S.sessioni = S.sessioni.filter(x => x.id !== id);
+  await db.elimina('sessioni', id);
 }
 export async function salvaTest(t) {
   S.test.push(t); S.test.sort((a, b) => a.ts - b.ts);

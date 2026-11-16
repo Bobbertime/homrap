@@ -240,8 +240,9 @@ function vistaRiepilogo() {
 registra('allenamento', ([cosa = 'giorno']) => {
   if (!S.test.length || (cosa === 'giorno' && !S.piano)) return { html: '', dopo: () => vai('oggi', true) };   // prima il test iniziale
   // Il riepilogo resta in memoria solo per andare al report e tornare indietro: arrivando da altrove si riparte da capo.
-  if (A && A.fase === 'riepilogo' && !['allenamento', 'report'].includes(vistaAttuale())) A = null;
+  if (A && A.fase === 'riepilogo' && (!['allenamento', 'report'].includes(vistaAttuale()) || !S.sessioni.includes(A.sessione))) A = null;
   if (!A && S.attivo && S.attivo.cosa === cosa) { A = copia(S.attivo); if (A.fase === 'amrap') { schermoAcceso(true); avviaTic(); } }
+  if (!A && vistaAttuale() === 'report') return { html: '', dopo: () => vai('oggi', true) };   // sessione cancellata dal report: niente nuovo allenamento a sorpresa
   if (!A || A.cosa !== cosa) crea(cosa);
   if (A.fase === 'amrap' && !tic) { schermoAcceso(true); avviaTic(); }
   const corpo = { anteprima: vistaAnteprima, guida: vistaGuida, conto: () => `<div class="spazio"></div><div class="centro"><p class="sec forte">${t('all.pronti')}</p><div class="gigante art" id="a-conto" style="font-size:220px">3</div></div><div class="spazio"></div>`,

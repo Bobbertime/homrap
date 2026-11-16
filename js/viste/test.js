@@ -1,21 +1,23 @@
 // Test iniziale e mensile (5 prove + trazioni facoltative) e schermata del risultato.
 import { S, salva, salvaTest, oggi, ultimoTest } from '../stato.js';
-import { t, tn } from '../i18n.js';
+import { t, tn, locale } from '../i18n.js';
 import { registra, vai, disegna } from '../router.js';
 import { esc, ico, conferma, interruttore } from '../ui.js';
 import { PROVE, PROVA_TRAZIONI, RECUPERO_SEC, TENUTA_MAX_SEC } from '../../data/soglie-test.js';
 import { valutaTest, valoreEq, miglioramento, AREE } from '../logica.js';
 import { uid, mmss } from '../util.js';
+import { recuperoBattito } from '../analisi.js';
 import { bip, parla, vibra, schermoAcceso, sbloccaAudio } from '../audio.js';
 
 let T = null, tic = null;
 const ora = () => Date.now();
 const provaCorrente = () => (T.i < PROVE.length ? PROVE[T.i] : PROVA_TRAZIONI);
 const ferma = () => { clearInterval(tic); tic = null; };
+const dopoBurpees = () => T.i > 0 && PROVE[T.i - 1] && PROVE[T.i - 1].id === 'burpees';   // il recupero in cui si può misurare il battito
 
 function nuovo(tipo) {
   const prec = ultimoTest();
-  T = { tipo, i: 0, fase: 'intro', ris: {}, conta: 0, t0: 0, tenuta: 0, detto: {}, conTrazioni: !!S.attrezzi.sbarra,
+  T = { tipo, i: 0, fase: 'intro', ris: {}, conta: 0, t0: 0, tenuta: 0, detto: {}, conTrazioni: !!S.attrezzi.sbarra, battito: { fine: '', dopo: '' },
     fac: { piegamenti: !!(prec && prec.ris.piegamenti && prec.ris.piegamenti.fac), burpees: !!(prec && prec.ris.burpees && prec.ris.burpees.fac) } };
 }
 function passa(fase) {
@@ -49,6 +51,7 @@ function batti() {
     const r = RECUPERO_SEC - s;
     if (r <= 0) { bip(1100, 0.3); parla(t('voce.recuperoFinito')); return passa('pronto'); }
     if (r <= 10) unaVolta('r', () => parla(t('voce.dieciSecondi')));
+    if (dopoBurpees() && T.battito.fine && s >= 60) unaVolta('bm', () => { parla(t('voce.minutoBattito')); vibra(120); });
     if (el) el.textContent = mmss(Math.ceil(r));
   }
 }
@@ -67,7 +70,10 @@ async function confermaProva() {
 }
 async function concludi() {
   ferma(); schermoAcceso(false);
-  await salvaTest({ id: uid(), ts: ora(), data: oggi(), tipo: T.tipo, ris: T.ris, blocco: S.piano ? S.piano.blocco : 0 });
+  const test = { id: uid(), ts: ora(), data: oggi(), tipo: T.tipo, ris: T.ris, blocco: S.piano ? S.piano.blocco : 0 };
+  const rec = recuperoBattito({ battito: T.battito });       // facoltativo: non cambia i livelli e non entra nei codici
+  if (rec) test.battito = { fine: rec.fine, dopo: rec.dopo };
+  await salvaTest(test);
   if (T.tipo !== 'iniziale') { S.backup.daRicordare = true; await salva('backup'); }
   T = null;
   vai('risultato', true);
@@ -89,6 +95,8 @@ registra('test', ([tipo = 'mensile']) => {
   } else if (T.fase === 'recupero') {
     html = `${testa(t('test.recupero'))}
       <div class="spazio"></div><div class="centro"><p class="sec forte">${t('test.recuperoTesto')}</p><div class="tempo" id="t-tempo">${mmss(RECUPERO_SEC)}</div></div>
+      ${dopoBurpees() ? `<div class="card col stretti"><h3>${t('test.recBattito')}</h3><p class="pic sec">${t('test.recBattitoTesto')}</p>
+        <div class="griglia2"><label class="campo">${t('test.recAdesso')}<input data-i="bpmFine" type="number" inputmode="numeric" value="${esc(T.battito.fine)}"></label><label class="campo">${t('test.recDopo')}<input data-i="bpmDopo" type="number" inputmode="numeric" value="${esc(T.battito.dopo)}"></label></div></div>` : ''}
       <div class="card"><span class="pic forte art">${t('test.prossima')}</span><h2 style="margin:2px 0 0">${t('prove.' + p.id + '.nome')}</h2><p class="sec pic">${t('prove.' + p.id + '.regole')}</p></div>
       <div class="spazio"></div><button class="btn largo" data-a="saltaRecupero">${t('test.saltaRecupero')}</button>`;
   } else {
@@ -128,6 +136,8 @@ registra('test', ([tipo = 'mensile']) => {
       ripeti: () => { T.conta = 0; T.tenuta = 0; passa('pronto'); },
       conferma: confermaProva,
       saltaRecupero: () => passa('pronto'),
+      bpmFine: el => { T.battito.fine = el.value; },
+      bpmDopo: el => { T.battito.dopo = el.value; },
       saltaTrazioni: concludi,
     },
     esci: () => { ferma(); schermoAcceso(false); },
@@ -147,12 +157,15 @@ registra('risultato', () => {
   const test = ultimoTest();
   if (!test) return { html: '', dopo: () => vai('oggi', true) };
   const v = valutaTest(test.ris, S.profilo || {}), prec = S.test[S.test.length - 2], mig = prec ? miglioramento(prec.ris, test.ris) : null;
+  const rec = recuperoBattito(test), recPrec = S.test.slice(0, -1).map(recuperoBattito).filter(Boolean).pop(), dRec = rec && recPrec ? rec.calo - recPrec.calo : null;
   const PROVA_AREA = { spinta: 'piegamenti', gambe: 'squat', cond: 'burpees', core: 'plank', posteriore: 'superman', trazione: 'trazioni' };
   return {
     html: `<main class="pagina piena">
       <div><span class="pic forte sec">${t('risultato.titolo')}</span><h1>${t('risultato.livello', { n: v.globale })} · ${t('livelli.' + v.globale + '.nome')}</h1><p class="sec" style="margin-top:6px">${t('livelli.' + v.globale + '.desc')}</p></div>
-      ${mig != null ? `<div class="card tenue fila tra"><div><h3>${t('risultato.miglioramento')}</h3><p class="pic sec">${t('risultato.rispetto', { data: new Date(prec.ts).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' }) })}</p></div><span class="grosso art">${mig > 0 ? '+' : ''}${mig}%</span></div>
+      ${mig != null ? `<div class="card tenue fila tra"><div><h3>${t('risultato.miglioramento')}</h3><p class="pic sec">${t('risultato.rispetto', { data: new Date(prec.ts).toLocaleDateString(locale(), { day: 'numeric', month: 'long' }) })}</p></div><span class="grosso art">${mig > 0 ? '+' : ''}${mig}%</span></div>
         <div class="card">${tabellaTest(prec, test)}</div>` : ''}
+      ${rec ? `<div class="card col stretti"><div class="fila tra"><h3>${t('risultato.recupero')}</h3><span class="medio">−${rec.calo} bpm</span></div>
+        <p class="pic sec">${t('risultato.recuperoTesto', { fine: rec.fine, dopo: rec.dopo })}${dRec == null ? '' : ' ' + t(dRec >= 3 ? 'risultato.recuperoMeglio' : dRec <= -3 ? 'risultato.recuperoPeggio' : 'risultato.recuperoUguale', { n: Math.abs(dRec) })}</p></div>` : ''}
       <h2>${t('risultato.aree')}</h2>
       <div class="col">${AREE.map(a => `<div class="card col stretti"><div class="fila tra"><span class="forte">${t('aree.' + a)}${v.aree[a].stimato ? ` <span class="sec pic">${t('risultato.stimato')}</span>` : ''}</span>
         <span><span class="sec pic">${v.aree[a].stimato ? '' : fmtProva(PROVA_AREA[a], test.ris[PROVA_AREA[a]]) + ' · '}</span><span class="num" style="font-size:20px">${t('risultato.liv', { n: v.aree[a].liv })}</span></span></div>${barraLivello(v.aree[a])}</div>`).join('')}</div>

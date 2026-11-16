@@ -4,7 +4,7 @@ import { avvia, impostaGuardia } from './router.js';
 import { t } from './i18n.js';
 import { applicaTema } from './azioni.js';
 import { eIOS, installata, chiediPersistenza, quandoInstallabile } from './piattaforma.js';
-import { ico, esc } from './ui.js';
+import { esc } from './ui.js';
 import './viste/onboarding.js';
 import './viste/test.js';
 import './viste/piano.js';
@@ -41,9 +41,6 @@ async function avvio() {
   await carica();
   applicaTema();
   if (window.matchMedia) matchMedia('(prefers-color-scheme: light)').addEventListener('change', applicaTema);
-  document.getElementById('nav').innerHTML = [['oggi', 'casa'], ['progressi', 'grafico'], ['classifica', 'coppa'], ['profilo', 'persona']]
-    .map(([nome, icona]) => `<a href="#/${nome}">${ico(icona)}${t('nav.' + nome)}</a>`).join('');
-  document.getElementById('nav').setAttribute('aria-label', t('nav.aria'));
   impostaGuardia(nome => (!S.stato.onboarding && !['benvenuto', 'installa', 'onboarding'].includes(nome) ? 'benvenuto' : null));
   // Su iOS, in Safari senza installazione, i dati possono essere cancellati dopo 7 giorni di inattività: avviso fisso.
   if (eIOS && !installata()) striscia(t('app.avvisoIOS'), t('app.comeInstallare'), () => { location.hash = '#/installa'; }, 'striscia-ios');

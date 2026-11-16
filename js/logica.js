@@ -64,7 +64,8 @@ export function miglioramento(prima, dopo) {
 }
 
 // ───────────────────────── Scelta degli esercizi
-export const haAttrezzi = (e, inv = {}) => e.att.every(g => g.some(a => inv[a]));
+// Tutti i gruppi di attrezzi devono essere soddisfatti. Un esercizio che vuole due manubri (paio) non vale per chi ne ha uno solo.
+export const haAttrezzi = (e, inv = {}) => e.att.every(g => g.some(a => inv[a] && !(e.paio && a === 'manubri' && inv[a].singolo)));
 const caricaInfortunio = (e, ctx) => (ctx.infortuni || []).some(z => (e.stress[z] || 0) >= 2);
 export const impattoAmmesso = ctx => !ctx.noSalti && !ctx.cauto && !ctx.gravidanza;
 export const valido = (e, ctx) => !!e && haAttrezzi(e, ctx.attrezzi) && !(ctx.scartati || []).includes(e.id) &&
@@ -373,7 +374,7 @@ export function sblocca(attrezzo, ctx) {
 export function consigliAcquisto(ctx, piano) {
   const schemi = [...new Set(['spinta', 'trazione', 'gambe', 'core', ...(piano ? piano.giorni.map(g => FOCUS_SCHEMA[g.focus]) : ['cond', 'posteriore'])])];
   const migliore = (c, s) => { const g = graduatoria(s, c); return g.length ? g[0].p : 0; };
-  const haTrazione = ['sbarra', 'elastici', 'manubri', 'anelli'].some(a => ctx.attrezzi[a]);
+  const haTrazione = ['sbarra', 'elastici', 'manubri', 'kettlebell', 'anelli'].some(a => ctx.attrezzi[a]);
   const out = [];
   for (const a of ATTREZZI) {
     if (ctx.attrezzi[a.id]) continue;
@@ -385,8 +386,9 @@ export function consigliAcquisto(ctx, piano) {
     for (const s of Object.keys(perSchema)) {
       if (s !== 'mobilita' && (ctx.livelli[s] || 1) >= 4) { bonus += 1; motivo = 'massimo'; schema = s; }   // già al massimo a corpo libero
     }
-    if (!haTrazione && perSchema.trazione) { bonus += a.id === 'sbarra' ? 1.5 : 1; motivo = 'trazione'; schema = 'trazione'; }
-    out.push({ attrezzo: a, punti: guadagno * 2 + bonus + nuovi.length * 0.15, guadagno, motivo, schema, perSchema, nuovi });
+    if (!haTrazione && perSchema.trazione) { bonus += a.id === 'sbarra' ? 1.5 : a.id === 'kettlebell' ? 0.75 : 1; /* la kettlebell aiuta la trazione con un solo esercizio */ motivo = 'trazione'; schema = 'trazione'; }
+    const movimenti = nuovi.filter(e => !e.paio).length;   // la versione a due manubri e quella a un braccio contano una volta sola
+    out.push({ attrezzo: a, punti: guadagno * 2 + bonus + movimenti * 0.15, guadagno, motivo, schema, perSchema, nuovi });
   }
   return out.sort((x, y) => y.punti - x.punti || (x.attrezzo.id < y.attrezzo.id ? -1 : 1)).slice(0, 3);
 }

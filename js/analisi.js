@@ -3,7 +3,7 @@
 // Modulo puro: nessun accesso a DOM o archivio, così si può provare con Node (tests/run.mjs).
 // Le frasi escono come { k, par }: i testi stanno in i18n/it.js sotto "rep.frase.<k>".
 import { giriEq } from './logica.js';
-import { media } from './util.js';
+import { media, lunedi, piuGiorni } from './util.js';
 
 // Confini delle 5 zone, come quota del battito massimo: Z1 sotto il 60%, Z2 60-70%, Z3 70-80%, Z4 80-90%, Z5 dal 90%.
 export const CONFINI_ZONE = [0.6, 0.7, 0.8, 0.9];
@@ -196,4 +196,59 @@ export function analizza(s, sessioni = [], profilo = {}) {
   const confronto = confronta(s, prec, max.valore);
   return { max, giri, fonteGiri: fonte, bpmGiri: bpmPerGiro(s, tempi, fonte), cuore, prec, confronto, eq: giriEq(s),
     mediaGiro: mediaGiroDi(s), frasi: lettura(s, { giri, cuore, confronto }) };
+}
+
+// ───────────────────────── Andamento nel tempo (scheda Progressi)
+// Le ultime sessioni complete e a ripetizioni piene di un tipo di giorno: giri, battito medio e calo finale.
+export function andamento(sessioni = [], tipoGiorno, max, n = 8) {
+  return sessioni.filter(s => s.tipo === 'amrap' && s.tipoGiorno === tipoGiorno && !s.interrotta && (s.fattore == null ? 1 : s.fattore) === 1)
+    .sort((a, b) => a.ts - b.ts).slice(-n).map(s => { const c = analisiCuore(s, max), g = analisiGiri(tempiGiriDi(s).tempi);
+      return { id: s.id, data: s.data, eq: giriEq(s), bpm: c ? c.medio : null, calo: g ? g.calo : null, fatica: numero(s.fatica) ? s.fatica : null }; });
+}
+// Confronta la prima e la seconda metà delle sessioni che hanno il battito (ne servono almeno 4).
+export function tendenza(punti = []) {
+  const con = punti.filter(p => p.bpm != null);
+  if (con.length < 4) return null;
+  const m = Math.floor(con.length / 2), prima = con.slice(0, m), dopo = con.slice(-m);
+  const dGiri = media(dopo.map(p => p.eq)) - media(prima.map(p => p.eq)), dBpm = media(dopo.map(p => p.bpm)) - media(prima.map(p => p.bpm));
+  const par = { giri: arrot1(Math.abs(dGiri)), bpm: Math.round(Math.abs(dBpm)), n: con.length };
+  if (dBpm <= -3 && dGiri >= -0.1) return { k: 'efficienza', par };
+  if (dBpm >= 3 && dGiri >= 0.25) return { k: 'piuLavoro', par };
+  if (dBpm >= 3) return { k: 'piuSforzo', par };
+  return { k: 'stabile', par };
+}
+
+// ───────────────────────── Carico della settimana: minuti di allenamento × fatica segnata (5 se manca)
+export const SOGLIE_CARICO = { salita: 1.3, settimane: 3, fatica: 8 };
+const allenamento = s => s.tipo === 'amrap' || s.tipo === 'sfida';
+function minutiDi(s) {
+  const giri = (s.tempiGiro || []).reduce((a, b) => a + b, 0);
+  return s.interrotta && giri > 0 ? giri / 60 : s.durata || 0;
+}
+export function caricoSettimane(sessioni = [], oggi, n = 6) {
+  const lun = lunedi(oggi), out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const da = piuGiorni(lun, -7 * i), a = piuGiorni(da, 6), ss = sessioni.filter(s => allenamento(s) && s.data >= da && s.data <= a);
+    out.push({ lunedi: da, sessioni: ss.length, carico: Math.round(ss.reduce((t, s) => t + minutiDi(s) * (numero(s.fatica) ? s.fatica : 5), 0)) });
+  }
+  return out;
+}
+// Avviso quando si sta accumulando troppo: settimana in corso dal 30% sopra la media delle 3 precedenti
+// (con almeno 2 sessioni questa settimana e 2 settimane di confronto), oppure le ultime 3 sessioni con fatica da 8 in su.
+export function avvisoCarico(sessioni = [], oggi) {
+  const S = SOGLIE_CARICO, sett = caricoSettimane(sessioni, oggi, S.settimane + 1), ora = sett[sett.length - 1], prima = sett.slice(0, -1).filter(w => w.carico > 0);
+  if (ora.sessioni >= 2 && prima.length >= 2) {
+    const m = media(prima.map(w => w.carico));
+    if (ora.carico >= m * S.salita) return { k: 'salito', par: { pct: Math.round((ora.carico / m - 1) * 100) } };
+  }
+  const ult = sessioni.filter(allenamento).sort((a, b) => a.ts - b.ts).slice(-3);
+  if (ult.length === 3 && ult.every(s => numero(s.fatica) && s.fatica >= S.fatica) && ult[2].data >= piuGiorni(lunedi(oggi), -7)) return { k: 'faticaAlta', par: {} };
+  return null;
+}
+
+// ───────────────────────── Battito di recupero nel test: quanto scende in un minuto dopo i burpees
+export function recuperoBattito(test) {
+  const b = test && test.battito; if (!b) return null;
+  const fine = Number(b.fine), dopo = Number(b.dopo);
+  return bpmValido(fine) && bpmValido(dopo) ? { fine, dopo, calo: fine - dopo } : null;
 }

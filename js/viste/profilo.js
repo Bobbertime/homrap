@@ -1,6 +1,6 @@
 // Scheda Profilo e schermate collegate: libreria esercizi, scheda esercizio, cosa comprare, orologi, sicurezza.
 import { S, salva, salvaSessione, contesto, importa, cancellaTutto, valutazione, oggi } from '../stato.js';
-import { t, tn, nomeEsercizio } from '../i18n.js';
+import { t, tn, nomeEsercizio, lingua, LINGUE } from '../i18n.js';
 import { registra, vai, disegna, indietro } from '../router.js';
 import { esc, ico, foglio, toast, conferma, avatar, sagoma, interruttore, intestazione, fmtData, fmtPunti, copiaTesto } from '../ui.js';
 import { consigliAcquisto, haAttrezzi, OBIETTIVI } from '../logica.js';
@@ -12,7 +12,7 @@ import { leggiFileOrologio, abbina, giriDaLap } from '../orologi.js';
 import { attivaDemo, disattivaDemo } from '../demo.js';
 import { mmss, linkVideo } from '../util.js';
 
-export const VERSIONE = '1.0.3';
+export const VERSIONE = '1.0.4';
 
 export async function ripristinaDaFile(file, dopo) {
   if (!file) return;
@@ -43,7 +43,7 @@ registra('profilo', () => {
         ${voce('grafico', t('prof.esperienza'), p.esperienza ? t('esperienza.' + p.esperienza + '.nome') : '', 'modifica/esperienza')}
         ${voce('corpo', t('prof.zone'), [...(p.infortuni || []), ...(p.zoneMeno || [])].map(z => t('zone.' + z)).join(', ') || t('prof.nessuna'), 'modifica/zone')}
         ${voce('calendario', t('prof.disponibilita'), `${tn('prof.giorniSett', p.giorni || 3)} · ${p.durata || 20} min`, 'modifica/disponibilita')}
-        ${voce('peso', t('prof.attrezzatura'), att.length ? att.map(a => t('attrezzi.' + a)).join(', ') : t('onb.att.soloCorpo'), 'modifica/attrezzatura')}
+        ${voce('peso', t('prof.attrezzatura'), att.length ? att.map(a => t('attrezzi.' + a) + (a === 'manubri' && S.attrezzi.manubri.singolo ? ` (${t('prof.unoSolo')})` : '')).join(', ') : t('onb.att.soloCorpo'), 'modifica/attrezzatura')}
         ${voce('orologio', t('prof.orologio'), S.orologio ? `${t('marche.' + S.orologio.marca)} ${S.orologio.modello || ''}` : t('onb.oro.nessuno'), 'modifica/orologio')}
         ${voce('scudo', t('prof.questionario'), p.sicurezza && p.sicurezza.cauto ? t('prof.cauto') : '', 'modifica/sicurezza')}</div>
       <h2>${t('prof.allenamento')}</h2><div class="col stretti">
@@ -55,6 +55,7 @@ registra('profilo', () => {
         ${voce('matita', t('prof.rifaiOnboarding'), '', 'onboarding')}</div>
       <h2>${t('prof.impostazioni')}</h2>
       <div class="seg" role="group" aria-label="${t('prof.tema')}">${['auto', 'scuro', 'chiaro'].map(x => `<button data-a="tema" data-v="${x}" aria-pressed="${(S.preferenze.tema || 'auto') === x}">${t('prof.temi.' + x)}</button>`).join('')}</div>
+      <div class="seg" role="group" aria-label="${t('prof.lingua')}">${Object.keys(LINGUE).map(x => `<button data-a="lingua" data-v="${x}" aria-pressed="${lingua() === x}">${t('prof.lingue.' + x)}</button>`).join('')}</div>
       <div class="col stretti">${interr('voce', t('prof.voce'), t('prof.voceDesc'))}${interr('suoni', t('prof.suoni'), '')}${interr('vibrazione', t('prof.vibrazione'), '')}${interr('noSalti', t('prof.noSalti'), t('prof.noSaltiDesc'))}</div>
       <h2>${t('prof.dati')}</h2><div class="col stretti">
         <button class="riga alta" data-a="backup"><span class="tondo">${ico('scarica', 18)}</span><span class="cresce"><span class="forte" style="display:block">${t('bak.salva')}</span><span class="pic sec">${giorniB == null ? t('bak.mai') : giorniB === 0 ? t('bak.oggi') : tn('bak.fa', giorniB)}</span></span></button>
@@ -65,6 +66,7 @@ registra('profilo', () => {
       <p class="pic sec centro">HoMRAP ${VERSIONE} · ${t('benvenuto.motto')}</p></main>`,
     azioni: {
       tema: async el => { S.preferenze.tema = el.dataset.v; await salva('preferenze'); applicaTema(); disegna(); },
+      lingua: async el => { S.preferenze.lingua = el.dataset.v; await salva('preferenze'); applicaTema(); disegna(); },
       pref: async el => { const k = el.dataset.v; S.preferenze[k] = !S.preferenze[k]; await salva('preferenze'); if (k === 'noSalti' && S.piano) return vai('piano/aggiorna'); disegna(); },
       backup: async () => { if (await salvaBackup()) disegna(); },
       ripristina: el => ripristinaDaFile(el.files[0]),
@@ -94,7 +96,7 @@ registra('esercizio', ([id]) => {
   return {
     html: `<main class="pagina piena">
       <div class="fila"><button class="ico-btn" data-a="indietro" aria-label="${t('comune.indietro')}">${ico('indietro')}</button><h1 style="font-size:24px">${esc(T('nome'))}</h1></div>
-      <div class="fila avvolgi stretti"><span class="pill ar">${t('schemi.' + e.schema)}</span><span class="pill">${t('risultato.liv', { n: e.liv })}</span>${e.att.length ? e.att.map(g => `<span class="pill">${g.map(a => t('attrezzi.' + a)).join(' / ')}</span>`).join('') : `<span class="pill">${t('esercizio.corpoLibero')}</span>`}${e.impatto ? `<span class="pill">${t('esercizio.salti')}</span>` : ''}</div>
+      <div class="fila avvolgi stretti"><span class="pill ar">${t('schemi.' + e.schema)}</span><span class="pill">${t('risultato.liv', { n: e.liv })}</span>${e.att.length ? e.att.map(g => `<span class="pill">${g.map(a => t('attrezzi.' + a)).join(' / ')}</span>`).join('') : `<span class="pill">${t('esercizio.corpoLibero')}</span>`}${e.paio ? `<span class="pill">${t('esercizio.paio')}</span>` : ''}${e.impatto ? `<span class="pill">${t('esercizio.salti')}</span>` : ''}</div>
       ${e.anim ? `<img src="${esc(e.anim)}" alt="" style="width:100%;border-radius:22px">` : ''}
       ${e.avviso ? `<div class="card tenue avviso"><span class="tondo">${ico('attenzione')}</span><p class="pic forte">${esc(T('avviso'))}</p></div>` : ''}
       <div class="card col"><div class="fila tra"><h3>${t('esercizio.muscoli')}</h3><span class="pic sec">${e.musc.map(m => t('muscoli.' + m)).join(', ')}</span></div>${sagoma(e.musc, e.musc2 || [])}</div>

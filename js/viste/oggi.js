@@ -9,6 +9,7 @@ import { lunedi, piuGiorni, giornoSett, meseISO, daIso } from '../util.js';
 import { risolviFastidio, salvaBackup, applicaTema } from '../azioni.js';
 import { attivaDemo, disattivaDemo } from '../demo.js';
 import { fmtVoce, testoMotivo } from './piano.js';
+import { avvisoCarico } from '../analisi.js';
 
 let comunque = '';
 const riga = (x, i) => `<a class="riga" href="#/esercizio/${x.id}" style="text-decoration:none;color:inherit"><span class="tondo ${x.slot === 'focus' ? 'ar' : ''}">${i + 1}</span><span class="cresce" style="font-weight:600">${esc(nomeEsercizio(x.id))}</span>${x.slot === 'focus' ? `<span class="etichetta">${t('comune.focus')}</span>` : ''}<span class="rip">${fmtVoce(x)}</span></a>`;
@@ -60,6 +61,8 @@ registra('oggi', () => {
   for (const id of S.esercizi.daDecidere) avvisi.push(avviso('attenzione', t('oggi.fastidio', { nome: nomeEsercizio(id) }), t('oggi.fastidioTesto'), `<button class="btn primario piccolo" data-a="decidi" data-v="${id}">${t('oggi.fastidioScegli')}</button>`));
   const sugg = suggerimentoAttivo();
   if (sugg) avvisi.push(cartaSuggerimento(sugg));
+  const carico = avvisoCarico(S.sessioni, d), chiaveCarico = carico && lun + ':' + carico.k;   // «Ho capito» vale per la settimana in corso
+  if (carico && S.stato.caricoVisto !== chiaveCarico) avvisi.push(avviso('attenzione', t('carico.titolo.' + carico.k), esc(t('carico.testo.' + carico.k, carico.par)), `<button class="btn piccolo" data-a="caricoVisto" data-v="${chiaveCarico}">${t('sugg.capito')}</button>`));
   const pausa = giorniDiPausa(S.sessioni, d);
   if (pausa > 21) avvisi.push(avviso('ricarica', t('oggi.bentornato'), t('oggi.pausaLunga', { n: pausa }), `<a class="btn primario piccolo" href="#/test/mensile">${t('oggi.rifaiTest')}</a>`));
   else if (inRipartenza(S.sessioni, d)) avvisi.push(avviso('ricarica', t('oggi.ripartenza'), t('oggi.ripartenzaTesto')));
@@ -99,6 +102,7 @@ registra('oggi', () => {
       esciDemo: async () => { const senzaTest = S.stato.demoSenzaTest; await disattivaDemo(); applicaTema(); toast(t('demo.spenta')); if (senzaTest) vai('test/iniziale'); else disegna(false); },
       backup: async () => { if (await salvaBackup()) disegna(); },
       backupDopo: async () => { S.stato.backupRimandato = d; await salva('stato'); disegna(); },
+      caricoVisto: async el => { S.stato.caricoVisto = el.dataset.v; await salva('stato'); disegna(); },
       decidi: el => {
         const id = el.dataset.v, alt = alternative(id, contesto({ daDecidere: [] }));
         foglio(`<h2 style="margin:0">${esc(nomeEsercizio(id))}</h2><p class="sec">${t('fine.fastidioScelta')}</p>
