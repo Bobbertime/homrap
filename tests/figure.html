@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoMRAP · figure animate</title>
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../css/app.css">
+<style>
+  /* Pagina di lavoro: serve a guardare le figure di js/figure.js mentre le si disegna. Non fa parte dell'app. */
+  .griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; align-items: end; }
+  .voce a { display: block; margin: 0 0 4px 4px; font-size: 13px; font-weight: 700; color: var(--txt2); text-decoration: none; }
+  .quadri { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .quadri .figura { padding: 2px; border-radius: 12px; }
+  .quadri span { display: block; text-align: center; font-size: 11px; color: var(--txt2); }
+  pre { font-size: 12px; white-space: pre-wrap; background: var(--sup); border-radius: 16px; padding: 12px; }
+</style>
+</head>
+<body>
+<main class="pagina piena" style="max-width:900px;margin:0 auto">
+  <div class="fila tra"><h1 style="font-size:24px">Figure animate</h1><button class="btn piccolo" id="tema">Tema</button></div>
+  <p class="sec pic" id="nota"></p>
+  <div id="qui"></div>
+</main>
+<script type="module">
+import { ELENCO_FIGURE, svgFigura, fotogrammi, figura, haFigura } from '../js/figure.js';
+import { IT } from '../i18n/it.js';
+
+const nome = id => (IT.esercizi[id] || IT.prove[id] || {}).nome || id, qui = document.getElementById('qui'), nota = document.getElementById('nota');
+const html = document.documentElement; html.dataset.tema = matchMedia('(prefers-color-scheme: light)').matches ? 'chiaro' : 'scuro';
+document.getElementById('tema').onclick = () => { html.dataset.tema = html.dataset.tema === 'chiaro' ? 'scuro' : 'chiaro'; };
+const id = new URLSearchParams(location.search).get('id');
+
+if (id && haFigura(id)) {
+  // Una figura sola: animata (un tocco la ferma), poi otto fotogrammi fermi e i dati delle pose.
+  const { durata, quadri } = fotogrammi(id), F = figura(id), N = 8;
+  nota.innerHTML = `<a href="figure.html">← tutte le figure</a> · <b>${nome(id)}</b> (${id}) · ciclo di ${durata.toFixed(2)} s, ${quadri.length - 1} fotogrammi`;
+  qui.innerHTML = `<div class="figura" id="viva" style="max-width:420px;margin:0 auto 12px">${svgFigura(id)}</div>
+    <div class="quadri">${Array.from({ length: N }, (_, i) => `<div><div class="figura" data-t="${(i / N) * durata}">${svgFigura(id)}</div><span>${((i / N) * durata).toFixed(2)} s</span></div>`).join('')}</div>
+    <h2>Pose</h2><pre>${Object.entries(F.pose).map(([k, p]) => `${k}: fermo in ${p.r} [${p.p.map(v => v.toFixed(1))}]\n   ${Object.entries(p.a).map(([o, g]) => `${o} ${Math.round(g)}`).join(' · ')}`).join('\n')}</pre>
+    <h2>Passi</h2><pre>${F.passi.map(x => `→ ${x.a} in ${x.t} s${x.r ? ' · fermo: ' + x.r : ''}${x.fissa ? ' · fissa: ' + JSON.stringify(x.fissa) : ''}${x.e ? ' · andatura: ' + x.e : ''}`).join('\n')}\npunti dichiarati fermi: ${(F.fermi || []).join(', ') || 'nessuno'}</pre>`;
+  for (const d of qui.querySelectorAll('[data-t]')) { const s = d.querySelector('svg'); s.pauseAnimations(); s.setCurrentTime(+d.dataset.t); }
+  const viva = document.getElementById('viva'); viva.onclick = () => { const s = viva.querySelector('svg'); if (s.animationsPaused()) s.unpauseAnimations(); else s.pauseAnimations(); };
+} else {
+  nota.textContent = `${ELENCO_FIGURE.length} figure. Tocca un nome per vederla da sola, fotogramma per fotogramma.`;
+  qui.className = 'griglia';
+  qui.innerHTML = ELENCO_FIGURE.map(k => `<div class="voce"><a href="?id=${k}">${nome(k)}</a><div class="figura">${svgFigura(k)}</div></div>`).join('');
+}
+</script>
+</body>
+</html>

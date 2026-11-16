@@ -85,7 +85,7 @@ for (const tema of ['dark', 'light']) {
   await page.click('[data-a="figura"]'); await pausa(100);
   esito('un tocco ferma la figura, un altro la fa ripartire', (await page.evaluate(() => document.querySelector('.figura svg').animationsPaused())) && (await page.getAttribute('.figura', 'aria-pressed')) === 'true'
     && (await page.click('[data-a="figura"]'), !(await page.evaluate(() => document.querySelector('.figura svg').animationsPaused()))));
-  await vai('esercizio/affondi_alternati');
+  await vai('esercizio/squat_cosacco');
   esito('un esercizio senza figura si apre lo stesso', (await page.locator('.figura').count()) === 0 && (await page.locator('.sagoma').count()) === 1);
   await vai('test/mensile'); await page.click('[data-a="inizia"]'); await pausa(250);
   esito('nel test la prova mostra la figura', (await page.locator('.figura svg animate').count()) >= 5 && (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0);
@@ -96,6 +96,11 @@ for (const tema of ['dark', 'light']) {
   await page.click('[data-a="conferma"]'); await pausa(300);
   esito('nel recupero si vede la figura della prova successiva', (await page.locator('.card .figura svg animate').count()) >= 5);
   await page.evaluate(() => location.reload()); await pausa(500);   // rimette a posto l'orologio e abbandona il test
+  await page.goto(BASE + 'tests/figure.html'); await pausa(600);
+  esito('la pagina di anteprima mostra tutte le figure', (await page.locator('.figura svg').count()) >= 38 && (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0);
+  await page.goto(BASE + 'tests/figure.html?id=bird_dog'); await pausa(400);
+  esito('anteprima di una figura sola, con i fotogrammi', (await page.locator('.quadri svg').count()) === 8);
+  await vai('oggi');
 
   // Lingua
   await vai('profilo'); await page.click('[data-a="lingua"][data-v="en"]'); await pausa(250);

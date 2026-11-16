@@ -248,5 +248,8 @@ ul.punti { margin: 0; padding-left: 20px; display: flex; flex-direction: column;
 .figura-svg .f-testa { fill: currentColor; }
 .figura-svg .f-terra { stroke: var(--lin); stroke-width: 3; }
 .figura-svg .f-attrezzo { stroke: var(--ar); stroke-width: 5; }
+.figura-svg .f-mobile { stroke: var(--txt2); stroke-width: 4; opacity: .55; }
+.figura-svg .f-filo { stroke: var(--ar); stroke-width: 2.5; }
+.figura-svg .f-peso { fill: var(--ar); stroke: var(--fig-sfondo); stroke-width: 2; }
 .figura-svg .f-ombra { opacity: .26; }
 .figura .f-stato { position: absolute; right: 10px; top: 10px; width: 30px; height: 30px; border-radius: 999px; background: var(--sup2); color: var(--txt2); display: flex; align-items: center; justify-content: center; }

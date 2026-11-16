@@ -12,7 +12,7 @@ import { leggiFileOrologio, abbina, giriDaLap } from '../orologi.js';
 import { attivaDemo, disattivaDemo } from '../demo.js';
 import { mmss, linkVideo, uid, isoData } from '../util.js';
 
-export const VERSIONE = '1.0.6';
+export const VERSIONE = '1.0.7';
 
 export async function ripristinaDaFile(file, dopo) {
   if (!file) return;

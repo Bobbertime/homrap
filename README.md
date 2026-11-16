@@ -30,7 +30,7 @@ Il file vuoto `.nojekyll` dice a GitHub di pubblicare i file così come sono: la
 Dopo ogni modifica ai file, apri `sw.js` e cambia la riga
 
 ```js
-const VERSIONE = 'homrap-1.0.6';
+const VERSIONE = 'homrap-1.0.7';
 ```
 
 per esempio in `homrap-1.0.6` (e, se vuoi che si veda in fondo al Profilo, anche `VERSIONE` in `js/viste/profilo.js`). Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
@@ -84,6 +84,9 @@ js/viste/               una schermata per file: onboarding, test, piano, oggi, a
 
 tests/run.mjs           test automatici della logica
 tests/schermate.mjs     prova facoltativa delle schermate in un browser (serve Playwright)
+tests/figure.mjs        controllo di una figura animata dal terminale, con le pose disegnate a caratteri
+tests/figure.html       pagina di lavoro per guardare tutte le figure (non fa parte dell'app)
+GUIDA-FIGURE.md         come disegnare una figura nuova nello stesso stile, passo per passo, anche con un assistente
 GUIDA-SVILUPPO.md       come modificare l'app senza rompere niente: mappa del codice, ricette, trappole
 ```
 
@@ -95,7 +98,7 @@ GUIDA-SVILUPPO.md       come modificare l'app senza rompere niente: mappa del co
 node tests/run.mjs
 ```
 
-Serve Node 18 o successivo. Sono 112 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione (anche con il battito), analisi della sessione per il Report (battito massimo, zone, giri, confronto, frasi), posizione salvata tornando indietro, link dei video, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato, niente battito né età), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni, inglese con le stesse chiavi dell'italiano, manubrio singolo e kettlebell, andamento, carico della settimana e battito di recupero, import in stile Suunto, battiti per giro e progressione a parità di circuito, pulizia dei codici ricevuti, repertorio degli esercizi, assenza di chiamate di rete, figure animate (ossa di lunghezza costante, niente sotto il pavimento, regole delle prove rispettate).
+Serve Node 18 o successivo. Sono 113 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione (anche con il battito), analisi della sessione per il Report (battito massimo, zone, giri, confronto, frasi), posizione salvata tornando indietro, link dei video, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato, niente battito né età), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni, inglese con le stesse chiavi dell'italiano, manubrio singolo e kettlebell, andamento, carico della settimana e battito di recupero, import in stile Suunto, battiti per giro e progressione a parità di circuito, pulizia dei codici ricevuti, repertorio degli esercizi, assenza di chiamate di rete, figure animate (ossa di lunghezza costante, niente sotto il pavimento, regole delle prove rispettate).
 
 Le schermate si provano con `node tests/schermate.mjs`: apre l'app in un browser a 390 px, tema scuro e chiaro, e controlla che ogni schermata si apra senza errori, più i percorsi principali. È facoltativa e serve Playwright; le istruzioni sono in cima al file.
 
@@ -140,17 +143,11 @@ La frase aggiunta alla ricerca si cambia in `i18n/it.js`, alla voce `esercizio.v
 
 ### Un'animazione
 
-Le figure animate sono disegnate dal codice, in `js/figure.js`: un omino schematico visto di lato, senza immagini e senza librerie. Oggi ci sono le cinque prove del test (squat, piegamenti, burpees, plank, superman), le due varianti facilitate e le trazioni; le stesse figure compaiono nella scheda degli esercizi con lo stesso `id`.
+Le figure animate sono disegnate dal codice, in `js/figure.js`: un omino schematico visto di lato, senza immagini e senza librerie. Oggi ne hanno una 38 esercizi su 99 (quelli che entrano più spesso nei piani), più il superman del test.
 
-Per aggiungerne una:
+Per aggiungerne una segui **`GUIDA-FIGURE.md`**: spiega lo stile, le coordinate, il metodo passo per passo, gli sbagli tipici, l'elenco di quelle che mancano e i messaggi già pronti per farsi aiutare da un assistente. In breve: scrivi in `js/figure.js` una funzione con le pose e i passi, la registri in `COSTRUTTORI` con l'`id` dell'esercizio, controlli con `node tests/figure.mjs <id>` e la guardi in `tests/figure.html?id=<id>`.
 
-1. In `js/figure.js` scrivi una funzione come `squat()`: le **pose** (un punto fermo e l'angolo di ogni osso: 0 = in avanti, 90 = in alto) e i **passi** ("vai alla posa X in t secondi"). L'ultimo passo deve tornare alla posa di partenza.
-2. Aggiungila a `COSTRUTTORI` con l'`id` dell'esercizio di `data/esercizi.js`.
-3. Lancia `node tests/run.mjs`: controlla da solo che le ossa non si allunghino, che niente entri nel pavimento e che il ciclo si chiuda.
-
-Mani e piedi appoggiati si tengono fermi con `fissa: ['mano']` nel passo; `verso(posa, 'mano', [x, y])` scrive una posa con la mano in un punto preciso. I dettagli sono in `GUIDA-SVILUPPO.md`.
-
-In alternativa resta valido un file già pronto: metti la GIF, il WebP o l'SVG animato in una cartella (per esempio `anim/affondi.webp`), aggiungi all'esercizio il campo `anim: 'anim/affondi.webp'` e il percorso all'elenco `FILE` di `sw.js`. Se l'esercizio ha una figura disegnata dal codice, vince quella.
+In alternativa resta valido un file già pronto: metti la GIF, il WebP o l'SVG animato in una cartella (per esempio `anim/pattinatore.webp`), aggiungi all'esercizio il campo `anim: 'anim/pattinatore.webp'` e il percorso all'elenco `FILE` di `sw.js`. Se l'esercizio ha una figura disegnata dal codice, vince quella.
 
 ### Una lingua
 
@@ -255,6 +252,19 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - Il campo `video` degli esercizi è vuoto per tutti: non sono stati inventati link. Un link che non è un indirizzo `https` di YouTube viene ignorato.
 - Posizione salvata: ogni pagina aperta riceve un numero nella cronologia del browser. Tornando indietro (freccia dell'app, tasto indietro di Android, gesto di iOS) la pagina riparte da dove era; aprendo una pagina nuova, o andando avanti con il browser, si parte dall'alto. Le frecce "indietro" delle intestazioni tornano davvero indietro nella cronologia quando la pagina precedente è quella attesa; altrimenti aprono la pagina madre dall'alto. Anche "Salva" in una voce del Profilo riporta al Profilo nel punto in cui era (tranne quando la modifica richiede di rivedere il piano). Le posizioni restano in memoria finché l'app è aperta, e sopravvivono a una ricarica.
 
+**Versione 1.0.7**
+
+- *Figure per gli esercizi più usati.* Ho contato quali esercizi finiscono più spesso in 4000 piani generati (metà senza attrezzi) e ho disegnato quelli: ora ha la figura circa il 90% delle voci di un piano a corpo libero, e l'85% contando anche i piani con attrezzi. In tutto 38 esercizi su 99, più il superman del test.
+- Restano senza figura gli esercizi che si muovono di lato (squat cosacco, jumping jack, step jack, pattinatore, pugilato a vuoto, piegamenti dell'arciere): l'omino è visto di profilo e lì non si capirebbero. Meglio nessuna figura che una figura che confonde.
+- Due esercizi che di profilo sono identici usano la stessa figura: i piegamenti a diamante quella dei piegamenti, il chin-up quella delle trazioni. La differenza (mani vicine, presa inversa) resta nei testi.
+- Superman Y-T-W: di profilo si vedono la Y (braccia avanti) e la W (gomiti tirati indietro); la T, con le braccia aperte verso chi guarda, non si può mostrare.
+- Plank laterale: è disegnato come lo si vede di fronte, con l'avambraccio a terra e l'altro braccio verso il soffitto.
+- Le figure a pancia in su hanno la testa a sinistra, le altre a destra: così ginocchia e gomiti si piegano dal lato giusto senza eccezioni nel codice.
+- Il motore ha qualche strumento in più, tutti usati da almeno una figura e coperti dai test: secondo braccio, schiena che si incurva (cat-cow, hollow hold), mobili e muri (sedia, panca, tavolo, parete), peso in mano, elastico che segue la mano.
+- Ogni figura dichiara quali punti devono restare fermi (`fermi`): un test controlla che non scivolino, insieme a lunghezza delle ossa, pavimento, scatti e chiusura del ciclo.
+- `tests/figure.html` è una pagina di lavoro per guardare tutte le figure dal telefono o dal computer; `tests/figure.mjs` fa gli stessi controlli dal terminale e disegna le pose a caratteri, per chi lavora senza browser. Nessuna delle due fa parte dell'app: non sono nella cache del service worker.
+- `GUIDA-FIGURE.md` raccoglie il metodo per disegnare le figure che mancano, con i messaggi pronti per farle fare a un assistente una alla volta.
+
 **Versione 1.0.6**
 
 - *Figure animate.* Sono disegnate dal codice (SVG con animazione nativa, nessun file immagine): pesano poco, seguono il tema scuro e chiaro e funzionano offline. Sono volutamente schematiche, un omino a tratti visto di lato: mostrano il movimento e il punto in cui la ripetizione vale, non sostituiscono un video.
@@ -310,7 +320,7 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 
 ## 6. Limiti noti
 
-- **Figure animate (1.0.6):** provate con i test automatici e in Chrome senza interfaccia a 390 px, tema scuro e chiaro, anche con "riduci movimento"; non su un telefono vero. Usano l'animazione nativa dell'SVG, presente in Chrome, Safari e Firefox attuali; su un browser che non la avesse la figura resterebbe ferma nella posizione di partenza. Sono schematiche: non mostrano la larghezza dei piedi o delle mani, né gli errori da evitare, che restano nei testi. Gli altri 92 esercizi non hanno ancora una figura.
+- **Figure animate (1.0.6):** provate con i test automatici e in Chrome senza interfaccia a 390 px, tema scuro e chiaro, anche con "riduci movimento"; non su un telefono vero. Usano l'animazione nativa dell'SVG, presente in Chrome, Safari e Firefox attuali; su un browser che non la avesse la figura resterebbe ferma nella posizione di partenza. Sono schematiche: non mostrano la larghezza dei piedi o delle mani, né gli errori da evitare, che restano nei testi. Dalla 1.0.7 hanno la figura 38 esercizi; gli altri 61 non ne hanno ancora una, e 13 di questi non si possono disegnare di profilo. Le figure aggiunte nella 1.0.7 sono state controllate una per una su fogli di fotogrammi, non in movimento su un telefono.
 - **Novità della 1.0.5** (import dall'orologio, battiti per giro, scheda Orologio, esercizi nuovi, caratteri dentro l'app): provate con i test automatici, con i quattro file veri del Suunto e con `tests/schermate.mjs` in Chrome senza interfaccia a 390 px, tema scuro e chiaro. Non provate su telefoni veri.
 - **Novità della 1.0.4** (manubrio singolo, correzione ed eliminazione delle sessioni, andamento, carico, battito di recupero, inglese): provate con i test automatici e in Chrome senza interfaccia a 390 px, tema scuro e chiaro. Non provate su telefoni veri.
 - **Inglese:** la traduzione non è stata riletta da un madrelingua. Gli avvisi vocali in inglese dipendono dalle voci installate sul telefono.

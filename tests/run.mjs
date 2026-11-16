@@ -502,7 +502,7 @@ prova('nessuna chiamata di rete: né pagina, né stile, né service worker, né 
     for (const r of righe) vero(/youtube\.com\/results|www\.w3\.org/.test(r) && !/fetch\(|src=|href="https/.test(r), `${f}: ${r.trim().slice(0, 90)}`); }
   vero(!/googleapis|gstatic/.test(readFileSync(join(radice, 'index.html'), 'utf8') + readFileSync(join(radice, 'sw.js'), 'utf8'))); });
 gruppo('Figure animate');
-const OSSA_FIG = [['piede', 'caviglia', 'punta'], ['tibia', 'caviglia', 'ginocchio'], ['coscia', 'ginocchio', 'anca'], ['busto', 'anca', 'spalla'], ['collo', 'spalla', 'testa'], ['braccio', 'spalla', 'gomito'], ['avambraccio', 'gomito', 'mano'], ['coscia', 'ginocchio2', 'anca'], ['tibia', 'caviglia2', 'ginocchio2'], ['piede', 'caviglia2', 'punta2']];
+const OSSA_FIG = [['piede', 'caviglia', 'punta'], ['tibia', 'caviglia', 'ginocchio'], ['coscia', 'ginocchio', 'anca'], ['busto', 'anca', 'spalla'], ['collo', 'spalla', 'testa'], ['braccio', 'spalla', 'gomito'], ['avambraccio', 'gomito', 'mano'], ['coscia', 'ginocchio2', 'anca'], ['tibia', 'caviglia2', 'ginocchio2'], ['piede', 'caviglia2', 'punta2'], ['braccio', 'spalla', 'gomito2'], ['avambraccio', 'gomito2', 'mano2']];
 const distF = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const fermoF = (quadri, nome) => Math.max(...quadri.map(J => distF(J[nome], quadri[0][nome])));   // di quanto si sposta un punto nel ciclo
 prova('ogni prova del test ha la sua figura, anche nella variante facilitata', () => {
@@ -515,13 +515,28 @@ prova('ogni prova del test ha la sua figura, anche nella variante facilitata', (
 prova('in ogni fotogramma le ossa hanno la loro lunghezza, niente entra nel pavimento e il ciclo si chiude', () => {
   for (const id of F.ELENCO_FIGURE) {
     const { durata, quadri } = F.fotogrammi(id);
-    vero(durata >= 2 && durata <= 6 && quadri.length === Math.round(durata * F.FPS) + 1, id + ': durata o numero di fotogrammi');
+    vero(durata >= 0.8 && durata <= 6 && quadri.length === Math.round(durata * F.FPS) + 1, id + ': durata o numero di fotogrammi');
     quadri.forEach((J, i) => {
       for (const [osso, a, b] of OSSA_FIG) vero(Math.abs(distF(J[a], J[b]) - F.OSSA[osso]) < 0.05, `${id} fotogramma ${i}: ${osso} lungo ${distF(J[a], J[b]).toFixed(2)}`);
       for (const [nome, p] of Object.entries(J)) vero(Number.isFinite(p[0]) && Number.isFinite(p[1]) && p[1] > -0.6, `${id} fotogramma ${i}: ${nome} a y ${p[1]}`);
     });
     for (const nome of Object.keys(quadri[0])) vero(distF(quadri[0][nome], quadri[quadri.length - 1][nome]) < 1e-6, id + ': il ciclo non si chiude su ' + nome);
   }
+});
+prova('ogni figura: pose e passi coerenti, appoggi dichiarati fermi davvero, nessuno scatto', () => {
+  for (const id of F.ELENCO_FIGURE) {
+    const fig = F.figura(id), { quadri } = F.fotogrammi(id);
+    vero(fig.pose[fig.inizio] && fig.pose[fig.ferma], id + ': inizio o ferma non sono pose');
+    vero(fig.passi.every(x => fig.pose[x.a] && x.t > 0) && fig.passi[fig.passi.length - 1].a === fig.inizio, id + ': i passi devono usare pose esistenti e tornare alla partenza');
+    for (const f of fig.fermi || []) vero(fermoF(quadri, f) < 0.05, `${id}: ${f} dovrebbe restare fermo e si sposta di ${fermoF(quadri, f).toFixed(2)}`);
+    // tra due fotogrammi nessun punto fa un salto: sarebbe un angolo scritto dal lato sbagliato o una posa irraggiungibile
+    for (let i = 1; i < quadri.length; i++) for (const nome of Object.keys(quadri[i])) vero(distF(quadri[i][nome], quadri[i - 1][nome]) < 55, `${id} fotogramma ${i}: ${nome} salta di ${distF(quadri[i][nome], quadri[i - 1][nome]).toFixed(0)}`);
+  }
+  vero(F.ELENCO_FIGURE.length >= 39 && ESERCIZI.filter(e => F.haFigura(e.id)).length >= 38, 'numero di figure');
+  // la guida elenca tutti gli esercizi ancora senza figura, e solo quelli: chi ne aggiunge una deve toglierla dall'elenco
+  const guida = readFileSync(join(radice, 'GUIDA-FIGURE.md'), 'utf8'), daFare = guida.slice(guida.indexOf('Da fare, in ordine di convenienza'), guida.indexOf('## 8.'));
+  uguale(ESERCIZI.filter(e => !F.haFigura(e.id) && !daFare.includes('`' + e.id + '`')).map(e => e.id), [], 'senza figura e non in elenco nella guida:');
+  uguale(ESERCIZI.filter(e => F.haFigura(e.id) && daFare.includes('`' + e.id + '`')).map(e => e.id), [], 'hanno già la figura ma sono ancora in elenco:');
 });
 prova('le figure rispettano le regole delle prove', () => {
   const posa = (id, nome) => F.giunti(F.figura(id).pose[nome]), q = id => F.fotogrammi(id).quadri;
@@ -560,9 +575,14 @@ prova('il disegno: animato o fermo, con il testo per lo screen reader e senza ni
     vero(!fermo.includes('<animate') && fermo.includes('role="img" aria-label="Figura: prova"') && fermo.includes('f-ombra'), id + ': svg fermo');
     for (const s of [vivo, fermo]) vero(!/NaN|undefined|Infinity|http|href|<script|<image/.test(s), id + ': contenuto inatteso');
     vero(vivo.length < 16000, id + ': disegno troppo pesante (' + vivo.length + ')');
-    const alto = +vivo.match(/viewBox="0 0 (\d+) (\d+)"/)[2]; vero(alto >= 40 && alto <= 180, id + ': altezza ' + alto);
+    const alto = +vivo.match(/viewBox="0 0 (\d+) (\d+)"/)[2]; vero(alto >= 30 && alto <= 180, id + ': altezza ' + alto);
   }
   vero(F.svgFigura('burpees_senza_salto').includes('f-dietro') && !F.svgFigura('squat').includes('f-dietro'), 'la seconda gamba si disegna solo dove serve');
+  vero(F.svgFigura('squat_sedia').includes('f-mobile') && F.svgFigura('goblet_squat').includes('f-peso') && F.svgFigura('trazioni').includes('f-attrezzo'), 'attrezzi di scena e peso in mano');
+  vero(F.svgFigura('rematore_elastico').includes('f-filo') && F.svgFigura('rematore_elastico', { fermo: true }).includes('f-filo'), 'elastico disegnato');
+  // la schiena si incurva solo dove serve: nel cat-cow il punto a metà del busto esce dalla linea anca-spalla
+  const gatto = F.giunti(F.figura('cat_cow').pose.gatto), dritto = F.giunti(F.figura('plank').pose.linea), fuori = J => Math.abs(J.schiena[1] - (J.anca[1] + J.spalla[1]) / 2);
+  vero(fuori(gatto) > 5 && fuori(dritto) < 1e-9, 'curva della schiena');
 });
 
 prova('settimana ISO e lunedì', () => { uguale(settimanaISO('2026-11-16'), '2026-W47'); uguale(settimanaISO('2027-01-01'), '2026-W53'); uguale(lunedi('2026-11-22'), '2026-11-16'); });
