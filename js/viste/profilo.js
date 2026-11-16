@@ -10,9 +10,9 @@ import { verificaBackup } from '../backup.js';
 import { salvaBackup, applicaTema, riammetti, risolviFastidio } from '../azioni.js';
 import { leggiFileOrologio, abbina, giriDaLap } from '../orologi.js';
 import { attivaDemo, disattivaDemo } from '../demo.js';
-import { mmss, linkVideo } from '../util.js';
+import { mmss, linkVideo, uid, isoData } from '../util.js';
 
-export const VERSIONE = '1.0.4';
+export const VERSIONE = '1.0.5';
 
 export async function ripristinaDaFile(file, dopo) {
   if (!file) return;
@@ -72,6 +72,7 @@ registra('profilo', () => {
       ripristina: el => ripristinaDaFile(el.files[0]),
       demo: async () => { if (S.stato.demo) await disattivaDemo(); else await attivaDemo(); applicaTema(); toast(t(S.stato.demo ? 'demo.accesa' : 'demo.spenta')); vai('oggi'); },
       cancella: async () => {
+        if (S.stato.demo) return toast(t('demo.bloccato'));   // cancellando nella demo si perderebbero anche i dati veri messi da parte
         if (!(await conferma(t('prof.cancellaTitolo'), t('prof.cancellaTesto'), t('prof.cancellaOk')))) return;
         if (!(await conferma(t('prof.cancellaTitolo2'), t('prof.cancellaTesto2'), t('prof.cancellaOk2')))) return;
         await cancellaTutto(); applicaTema(); vai('benvenuto');
@@ -83,7 +84,7 @@ registra('profilo', () => {
 registra('libreria', () => {
   const ctx = contesto();
   return { html: `<main class="pagina piena">${intestazione(t('prof.libreria'))}<p class="sec">${t('lib.testo')}</p>
-    ${SCHEMI.map(s => `<h2>${t('schemi.' + s)}</h2><div class="col stretti">${ESERCIZI.filter(e => e.schema === s).map(e => { const ok = haAttrezzi(e, ctx.attrezzi), no = S.esercizi.scartati.includes(e.id);
+    ${SCHEMI.map(s => `<h2>${t('schemi.' + s)}</h2><div class="col stretti">${ESERCIZI.filter(e => e.schema === s).sort((a, b) => a.liv - b.liv).map(e => { const ok = haAttrezzi(e, ctx.attrezzi), no = S.esercizi.scartati.includes(e.id);
       return `<a class="riga ${ok && !no ? '' : 'spento'}" href="#/esercizio/${e.id}" style="text-decoration:none;color:inherit"><span class="tondo num" style="font-size:18px">${e.liv}</span><span class="cresce"><span style="font-weight:600;display:block">${esc(nomeEsercizio(e.id))}</span>${no ? `<span class="pic sec">${t('lib.escluso')}</span>` : e.att.length ? `<span class="pic sec">${e.att.map(g => g.map(a => t('attrezzi.' + a)).join(' / ')).join(' + ')}</span>` : ''}</span><span class="sec">${ico('avanti', 18)}</span></a>`; }).join('')}</div>`).join('')}</main>` };
 });
 
@@ -126,21 +127,44 @@ registra('comprare', () => {
 
 // ── Orologi: guide per marca, importazione dei file e inserimento manuale
 const MARCHE = ['garmin', 'apple', 'fitbit', 'polar', 'suunto', 'coros', 'amazfit', 'samsung', 'altro'];
-const etichettaSessione = s => `${fmtData(s.data, { weekday: 'short', day: 'numeric', month: 'short' })} · ${s.tipo === 'sfida' ? t('cla.quale.sfida') : t('piano.giorno', { tipo: s.tipoGiorno })} · ${fmtPunti(s.giri, s.extra)}`;
+const etichettaSessione = s => `${fmtData(s.data, { weekday: 'short', day: 'numeric', month: 'short' })} · ${s.tipo === 'orologio' ? (s.etichetta || t('rep.soloOrologio')) : s.tipo === 'sfida' ? t('cla.quale.sfida') : t('piano.giorno', { tipo: s.tipoGiorno })} · ${fmtPunti(s.giri, s.extra)}`;
 async function collega(s, d) {
   const lap = giriDaLap(d);
-  const fine = async giri => { s.orologio = d; if (giri != null) s.giri = giri; await salvaSessione(s); toast(t('oro.collegato')); vai('report/' + s.id); };   // dopo l'import si apre il report
+  const fine = async giri => { s.orologio = d; if (giri != null) s.giri = giri; await salvaSessione(s); toast(t('oro.collegato')); vai('report/' + encodeURIComponent(s.id)); };   // dopo l'import si apre il report
   if (d.giri.length && lap !== s.giri) {
     foglio(`<h2 style="margin:0">${t('fine.lapTitolo')}</h2><p class="sec">${t('fine.lapTesto', { lap, app: s.giri })}</p>
       <button class="btn primario largo" data-a="file">${tn('fine.lapUsaFile', lap)}</button><button class="btn largo" data-a="app">${tn('fine.lapUsaApp', s.giri)}</button>`,
     { file: (b, ev, chiudi) => { chiudi(); fine(lap); }, app: (b, ev, chiudi) => { chiudi(); fine(null); } }, { bloccato: true });
   } else await fine(null);
 }
-function scegliSessione(titolo, alScelta) {
-  const ultime = S.sessioni.filter(s => s.tipo !== 'test').slice(-10).reverse();
-  if (!ultime.length) return toast(t('oro.nessunaSessione'));
-  foglio(`<h2 style="margin:0">${esc(titolo)}</h2>${ultime.map(s => `<button class="riga alta" data-a="s" data-v="${s.id}"><span class="cresce" style="font-weight:600">${esc(etichettaSessione(s))}</span>${s.orologio ? `<span class="sec">${ico('orologio', 18)}</span>` : ''}</button>`).join('')}<button class="btn largo" data-a="chiudi">${t('comune.annulla')}</button>`,
-  { s: (el, ev, chiudi) => { chiudi(); alScelta(S.sessioni.find(x => x.id === el.dataset.v)); } });
+// Allenamento fatto senza l'app: dal file nasce una sessione di tipo "orologio", con un nome di circuito per confrontare solo quelli uguali.
+function creaDaOrologio(d) {
+  const gia = d.inizio && S.sessioni.find(x => x.tipo === 'orologio' && x.inizio === d.inizio);
+  if (gia) { toast(t('oro.giaImportato')); return vai('report/' + encodeURIComponent(gia.id)); }
+  const quando = d.inizio ? new Date(d.inizio) : new Date(), nomi = [...new Set(S.sessioni.filter(x => x.tipo === 'orologio' && x.etichetta).map(x => x.etichetta))].slice(-6);
+  let completo = false;
+  const corpo = () => `<h2 style="margin:0">${t('oro.creaTitolo')}</h2>
+    <p class="pic sec">${esc([fmtData(isoData(quando), { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }), mmss(d.durata), d.bpmMedio ? d.bpmMedio + ' bpm' : '', tn('fine.lap', d.giri.length)].filter(Boolean).join(' · '))}</p>
+    <label class="campo">${t('oro.nomeCircuito')}<input data-k="nome" maxlength="30" placeholder="${t('oro.nomeEsempio')}"></label>
+    ${nomi.length ? `<div class="fila avvolgi stretti">${nomi.map(n => `<button class="chip" data-a="nome" data-v="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}
+    <p class="pic sec">${t('oro.nomeNota')}</p>
+    ${d.giri.length ? `<div class="col stretti"><span class="pic forte sec">${t('oro.ultimoLap')}</span><div class="seg"><button data-a="lap" data-v="0" aria-pressed="${!completo}">${t('oro.ultimoIncompleto')}</button><button data-a="lap" data-v="1" aria-pressed="${completo}">${t('oro.ultimoCompleto')}</button></div></div>` : ''}
+    <button class="btn primario largo" data-a="ok">${t('comune.salva')}</button><button class="btn largo" data-a="chiudi">${t('comune.annulla')}</button>`;
+  foglio(corpo(), {
+    nome: (b, ev, chiudi, velo) => { velo.querySelector('[data-k="nome"]').value = b.dataset.v; },
+    lap: (b, ev, chiudi, velo) => { const nome = velo.querySelector('[data-k="nome"]').value; completo = b.dataset.v === '1'; velo.querySelector('.foglio').innerHTML = corpo(); velo.querySelector('[data-k="nome"]').value = nome; },
+    ok: async (b, ev, chiudi, velo) => {
+      const s = { id: uid(), ts: quando.getTime(), inizio: d.inizio || quando.getTime(), data: isoData(quando), tipo: 'orologio', etichetta: velo.querySelector('[data-k="nome"]').value.trim().slice(0, 30), blocco: 0, tipoGiorno: null, focus: null, rev: 0, fattore: 1, motivo: null, leggero: false,
+        durata: Math.max(1, Math.round((d.durata - (d.pausa || 0)) / 60)), esercizi: [], obiettivo: 0, ripGiro: 0, giri: completo ? d.giri.length : giriDaLap(d), extra: 0, tempiGiro: [], fatica: null, fastidi: [], note: '', modalita: 'orologio', orologio: d };
+      await salvaSessione(s); chiudi(); toast(t('oro.creato')); vai('report/' + encodeURIComponent(s.id));
+    } });
+}
+function scegliSessione(titolo, alScelta, file = null) {
+  const ultime = S.sessioni.filter(s => s.tipo !== 'test' && s.tipo !== 'orologio').slice(-10).reverse();
+  if (!ultime.length && !file) return toast(t('oro.nessunaSessione'));
+  if (!ultime.length) return creaDaOrologio(file);
+  foglio(`<h2 style="margin:0">${esc(titolo)}</h2>${file ? `<button class="btn primario largo" data-a="crea">${ico('orologio')}${t('oro.crea')}</button><p class="pic sec">${t('oro.creaTesto')}</p>` : ''}${ultime.map(s => `<button class="riga alta" data-a="s" data-v="${esc(s.id)}"><span class="cresce" style="font-weight:600">${esc(etichettaSessione(s))}</span>${s.orologio ? `<span class="sec">${ico('orologio', 18)}</span>` : ''}</button>`).join('')}<button class="btn largo" data-a="chiudi">${t('comune.annulla')}</button>`,
+  { s: (el, ev, chiudi) => { chiudi(); alScelta(S.sessioni.find(x => x.id === el.dataset.v)); }, crea: (el, ev, chiudi) => { chiudi(); creaDaOrologio(file); } });
 }
 registra('orologi', () => {
   const mia = S.orologio && S.orologio.marca, ordine = mia ? [mia, ...MARCHE.filter(m => m !== mia)] : MARCHE;
@@ -160,11 +184,13 @@ registra('orologi', () => {
       ricerca: el => copiaTesto(el.dataset.v),
       file: async el => {
         let d; try { d = await leggiFileOrologio(el.files[0]); } catch { return toast(t('oro.fileNonValido')); }
+        const gia = d.inizio && S.sessioni.find(x => x.tipo === 'orologio' && x.inizio === d.inizio);
+        if (gia) { toast(t('oro.giaImportato')); return vai('report/' + encodeURIComponent(gia.id)); }
         const s = abbina(d, S.sessioni), riassunto = [mmss(d.durata), d.bpmMedio ? d.bpmMedio + ' bpm' : '', d.calorie ? d.calorie + ' kcal' : '', tn('fine.lap', d.giri.length)].filter(Boolean).join(' · ');
-        if (!s) return scegliSessione(t('oro.scegliSessione'), x => collega(x, d));
+        if (!s) return scegliSessione(t('oro.nessunAbbinamento'), x => collega(x, d), d);   // nessuna sessione dell'app a quell'ora: di solito è un allenamento fatto solo con l'orologio
         foglio(`<h2 style="margin:0">${t('oro.abbinato')}</h2><div class="card col stretti"><span class="forte">${esc(etichettaSessione(s))}</span><span class="pic sec">${esc(riassunto)}</span></div>
           <button class="btn primario largo" data-a="ok">${t('comune.conferma')}</button><button class="btn largo" data-a="altra">${t('oro.altraSessione')}</button>`,
-        { ok: (b, ev, chiudi) => { chiudi(); collega(s, d); }, altra: (b, ev, chiudi) => { chiudi(); scegliSessione(t('oro.scegliSessione'), x => collega(x, d)); } });
+        { ok: (b, ev, chiudi) => { chiudi(); collega(s, d); }, altra: (b, ev, chiudi) => { chiudi(); scegliSessione(t('oro.scegliSessione'), x => collega(x, d), d); } });
       },
       manuale: () => scegliSessione(t('oro.manualeTitolo'), s => {
         const o = s.orologio || {};
@@ -175,7 +201,7 @@ registra('orologi', () => {
         { ok: async (b, ev, chiudi, velo) => {
           const val = k => Number(String(velo.querySelector(`[data-k="${k}"]`).value).replace(',', '.')) || null;
           s.orologio = { ...o, durata: val('durata') ? Math.round(val('durata') * 60) : null, bpmMedio: val('bpmMedio'), calorie: val('calorie') };
-          await salvaSessione(s); chiudi(); toast(t('comune.salvato')); vai('report/' + s.id);
+          await salvaSessione(s); chiudi(); toast(t('comune.salvato')); vai('report/' + encodeURIComponent(s.id));
         } });
       }),
     },

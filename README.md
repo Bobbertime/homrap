@@ -16,7 +16,7 @@ Serve solo un account GitHub gratuito. Bastano 10 minuti e si fa tutto dal brows
 2. In alto a destra tocca **+** → **New repository**.
 3. In "Repository name" scrivi `homrap`. Lascia **Public**. Non spuntare altro. Tocca **Create repository**.
 4. Nella pagina che compare tocca il link **uploading an existing file**.
-5. Sul computer apri la cartella `homrap` (quella estratta da `homrap.zip`), seleziona **tutto il contenuto** (i file e le cartelle `css`, `js`, `data`, `i18n`, `icons`, `tests`) e trascinalo nella pagina. Attenzione: va trascinato il contenuto, non la cartella `homrap` stessa: `index.html` deve finire al primo livello del repository.
+5. Sul computer apri la cartella `homrap` (quella estratta da `homrap.zip`), seleziona **tutto il contenuto** (i file e le cartelle `css`, `js`, `data`, `i18n`, `icons`, `fonts`, `tests`) e trascinalo nella pagina. Attenzione: va trascinato il contenuto, non la cartella `homrap` stessa: `index.html` deve finire al primo livello del repository.
 6. Aspetta la fine del caricamento e tocca **Commit changes**.
 7. Vai in **Settings** (in alto) → **Pages** (a sinistra).
 8. In "Build and deployment", alla voce **Source** scegli **Deploy from a branch**. Sotto, in **Branch**, scegli `main` e `/ (root)`, poi **Save**.
@@ -30,10 +30,10 @@ Il file vuoto `.nojekyll` dice a GitHub di pubblicare i file così come sono: la
 Dopo ogni modifica ai file, apri `sw.js` e cambia la riga
 
 ```js
-const VERSIONE = 'homrap-1.0.4';
+const VERSIONE = 'homrap-1.0.5';
 ```
 
-per esempio in `homrap-1.0.5` (e, se vuoi che si veda in fondo al Profilo, anche `VERSIONE` in `js/viste/profilo.js`). Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
+per esempio in `homrap-1.0.6` (e, se vuoi che si veda in fondo al Profilo, anche `VERSIONE` in `js/viste/profilo.js`). Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
 
 ### Provarla sul computer
 
@@ -55,6 +55,7 @@ manifest.webmanifest    nome, icone e colori per l'installazione
 sw.js                   service worker: cache per l'uso offline e avviso di nuova versione
 css/app.css             tutto lo stile (tema scuro e chiaro)
 icons/                  icone 192 e 512 (anche maskable) e apple-touch-icon 180
+fonts/                  i due caratteri tipografici dell'app, con le loro licenze
 
 data/esercizi.js        libreria esercizi (numeri e regole, senza testi)
 data/attrezzi.js        inventario degli attrezzi e fasce di prezzo
@@ -81,6 +82,8 @@ js/util.js              date, CRC32, base64url, generatore casuale con seme
 js/viste/               una schermata per file: onboarding, test, piano, oggi, allenamento, progressi, report, classifica, profilo
 
 tests/run.mjs           test automatici della logica
+tests/schermate.mjs     prova facoltativa delle schermate in un browser (serve Playwright)
+GUIDA-SVILUPPO.md       come modificare l'app senza rompere niente: mappa del codice, ricette, trappole
 ```
 
 `logica.js`, `analisi.js`, `classifica.js`, `orologi.js`, `backup.js` e `util.js` sono moduli "puri": non toccano né la pagina né l'archivio, quindi si provano con Node.
@@ -91,7 +94,9 @@ tests/run.mjs           test automatici della logica
 node tests/run.mjs
 ```
 
-Serve Node 18 o successivo. Sono 98 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione (anche con il battito), analisi della sessione per il Report (battito massimo, zone, giri, confronto, frasi), posizione salvata tornando indietro, link dei video, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato, niente battito né età), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni, inglese con le stesse chiavi dell'italiano, manubrio singolo e kettlebell, andamento, carico della settimana e battito di recupero.
+Serve Node 18 o successivo. Sono 108 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione (anche con il battito), analisi della sessione per il Report (battito massimo, zone, giri, confronto, frasi), posizione salvata tornando indietro, link dei video, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato, niente battito né età), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni, inglese con le stesse chiavi dell'italiano, manubrio singolo e kettlebell, andamento, carico della settimana e battito di recupero, import in stile Suunto, battiti per giro e progressione a parità di circuito, pulizia dei codici ricevuti, repertorio degli esercizi, assenza di chiamate di rete.
+
+Le schermate si provano con `node tests/schermate.mjs`: apre l'app in un browser a 390 px, tema scuro e chiaro, e controlla che ogni schermata si apra senza errori, più i percorsi principali. È facoltativa e serve Playwright; le istruzioni sono in cima al file.
 
 ---
 
@@ -186,7 +191,7 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - Nessuna libreria esterna: tutto è scritto a mano, compresi il decoder FIT e il CRC32.
 - IndexedDB con tre archivi (`kv`, `sessioni`, `test`). Lo schema dei dati ha una versione (`SCHEMA` in `js/backup.js`) e un elenco di migrazioni, usato sia all'avvio sia nel ripristino di un backup vecchio. Un backup di una versione futura viene rifiutato.
 - Il checksum del backup è un CRC32: riconosce un file rovinato, non è una protezione.
-- I font Google vengono messi in cache dal service worker alla prima apertura. Senza rete alla prima apertura si vedono i font di sistema.
+- I caratteri tipografici (Plus Jakarta Sans e Barlow Condensed, licenza SIL Open Font License) sono dentro l'app, nella cartella `fonts/`: dalla 1.0.5 l'app non fa nessuna richiesta a server esterni.
 - Un allenamento interrotto (telefono bloccato, app chiusa) viene ripreso alla riapertura.
 - Dove `navigator.share` non c'è (per esempio sul computer), testo e codici vengono copiati e i file scaricati.
 
@@ -239,6 +244,18 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - Il campo `video` degli esercizi è vuoto per tutti: non sono stati inventati link. Un link che non è un indirizzo `https` di YouTube viene ignorato.
 - Posizione salvata: ogni pagina aperta riceve un numero nella cronologia del browser. Tornando indietro (freccia dell'app, tasto indietro di Android, gesto di iOS) la pagina riparte da dove era; aprendo una pagina nuova, o andando avanti con il browser, si parte dall'alto. Le frecce "indietro" delle intestazioni tornano davvero indietro nella cronologia quando la pagina precedente è quella attesa; altrimenti aprono la pagina madre dall'alto. Anche "Salva" in una voce del Profilo riporta al Profilo nel punto in cui era (tranne quando la modifica richiede di rivedere il piano). Le posizioni restano in memoria finché l'app è aperta, e sopravvivono a una ricarica.
 
+**Versione 1.0.5**
+
+- *Import controllato su file veri.* Quattro allenamenti di un Suunto Race S (settembre 2026) sono stati letti e confrontati con un secondo lettore scritto apposta: inizio, durata, battito medio e massimo, calorie, curva e lap coincidono. Da quei file sono nate tre aggiunte: ogni lap salva tempo trascorso, tempo senza pause, battito medio e inizio; si salva la *copertura* del sensore (quota dei secondi che hanno il battito: in tre file su quattro era tra il 76 e l'84%); si salvano i secondi di pausa.
+- *Cosa si usa e cosa no.* Per misurare i progressi l'app usa solo conteggi e misure: giri, tempo dei giri, battito. Non usa calorie, tempo di recupero ed EPOC dell'orologio, che sono stime.
+- *Battiti per giro.* È il battito medio di un giro per la sua durata: quanti battiti costa un giro. Si calcola solo sui giri completi; un giro con più di 10 secondi di pausa viene scartato. Con i giri dell'app serve la curva allineata; con i lap dell'orologio si usa il battito medio del lap. Qualità: buona con copertura dal 90%, discreta dal 70%, scarsa sotto il 70% (in questo caso la sessione non entra nell'andamento).
+- *A parità di circuito.* Giri e battiti per giro si confrontano solo tra sessioni con lo stesso circuito: stesso giorno, stessi esercizi, ripetizioni, kg, durata e nessuna riduzione; per la sfida stesso mese e variante. Quando il piano cambia (per esempio accettando un suggerimento) parte una serie nuova. In Progressi la carta "A parità di circuito" confronta la media della prima metà della serie con quella della seconda e dà un verdetto solo se i dati bastano: per i giri bastano 2 sessioni e 0,25 giri di differenza (è un conteggio); per i battiti per giro servono almeno 3 sessioni valide e almeno il 5% di differenza, perché il battito cambia di qualche punto da un giorno all'altro; con 3 sessioni il verdetto è "indicativo", da 4 "attendibile". Le soglie sono in `js/analisi.js` (`SOGLIE_MISURA`).
+- *Allenamenti fatti solo con l'orologio.* Se un file non corrisponde a nessuna sessione dell'app, si può creare un allenamento dall'orologio (tipo `orologio`): entra nel calendario, nel carico della settimana e in Progressi, nella scheda "Orologio". Gli si dà un nome di circuito: si confrontano solo allenamenti con lo stesso nome, e senza nome non si confronta con niente. Per questi allenamenti il confronto è sul tempo del giro (dal 3% in su) e non sul numero di giri, perché la durata registrata cambia. Non contano per la serie di giorni, per il piano e per la classifica. Lo stesso file importato due volte non crea doppioni.
+- *Libreria esercizi.* Da 54 a 99 esercizi. Ogni attrezzo (tranne il tappetino, che è solo comodità) ha almeno 3 esercizi su più livelli; ogni schema ha esercizi per tutti i livelli da 1 a 5, e a corpo libero li copre tutti tranne la trazione, dove dal livello 4 servono la sbarra o gli anelli. La panca, che prima non sbloccava niente, ora ha tre esercizi. In "Cosa comprare dopo" la varietà conta fino a 6 esercizi per attrezzo, così un attrezzo con tanti esercizi non scavalca quello che serve davvero. La libreria è ordinata per livello.
+- *Sicurezza dei codici incollati.* I dati che arrivano da un codice vengono ripuliti prima dell'uso (`normalizzaMembro`): restano solo i campi previsti, del tipo giusto e nei limiti. Un codice scritto a mano non può portare testo o numeri strani nelle schermate.
+- *Demo.* Con i dati di esempio accesi non si può salvare un backup, cancellare tutti i dati o condividere i codici della classifica: il backup conterrebbe dati finti, la cancellazione eliminerebbe anche i dati veri messi da parte, i codici manderebbero agli amici risultati di esempio.
+- *Correzioni.* Un suggerimento di progressione poteva proporre lo stesso esercizio per due posti del circuito: ora non più. I fogli aperti si chiudono quando si cambia pagina. Il tempo del giro dei lap dell'orologio non comprende più le pause.
+
 **Versione 1.0.4**
 
 - *Un solo manubrio.* In Attrezzatura, sotto i kg dei manubri, c'è l'interruttore "Ho un solo manubrio". Non viene trattato come una kettlebell (lo swing con un manubrio è un altro movimento). Gli esercizi che vogliono due manubri hanno il campo `paio: true` in `data/esercizi.js` (distensioni a terra e lento avanti) e non vengono proposti a chi ne ha uno; al loro posto ci sono due esercizi nuovi a un braccio, con le ripetizioni per lato, disponibili anche a chi ha due manubri. Rematore, goblet squat e stacco rumeno (un peso tenuto con due mani) restano.
@@ -270,6 +287,7 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 
 ## 6. Limiti noti
 
+- **Novità della 1.0.5** (import dall'orologio, battiti per giro, scheda Orologio, esercizi nuovi, caratteri dentro l'app): provate con i test automatici, con i quattro file veri del Suunto e con `tests/schermate.mjs` in Chrome senza interfaccia a 390 px, tema scuro e chiaro. Non provate su telefoni veri.
 - **Novità della 1.0.4** (manubrio singolo, correzione ed eliminazione delle sessioni, andamento, carico, battito di recupero, inglese): provate con i test automatici e in Chrome senza interfaccia a 390 px, tema scuro e chiaro. Non provate su telefoni veri.
 - **Inglese:** la traduzione non è stata riletta da un madrelingua. Gli avvisi vocali in inglese dipendono dalle voci installate sul telefono.
 - **Battito di recupero:** va letto dall'orologio e scritto a mano durante il recupero, quindi dipende da quanto sei puntuale nel guardarlo.
@@ -284,7 +302,11 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - **Provata in un browser desktop** (Chrome senza interfaccia, 390 px, tema scuro e chiaro) e con i test automatici. Non è stata provata su un iPhone e su un Android veri: installazione, voce, vibrazione, schermo sempre acceso e condivisione verso WhatsApp vanno verificati sui telefoni.
 - **iPhone:** la vibrazione non esiste nelle web app; la voce può restare muta se il telefono è in modalità silenziosa; lo schermo sempre acceso richiede iOS 16.4 o successivo e, nell'app installata, sulle versioni di iOS meno recenti può non funzionare. Se l'app non viene installata, Safari può cancellare i dati dopo 7 giorni di inattività: l'app lo ricorda con un avviso fisso.
 - **Timer in secondo piano:** se durante l'AMRAP cambi app o blocchi il telefono, il tempo continua a scorrere correttamente, ma gli avvisi vocali di quel periodo vanno persi.
-- **Decoder FIT:** legge i messaggi session, lap e record (tempo, battito, calorie). È stato provato con file generati dai test, non con file veri di ogni marca: se un file non viene letto, c'è sempre l'inserimento manuale.
+- **Decoder FIT:** legge i messaggi session, lap e record (tempo, battito, calorie). È stato provato con quattro file veri di un Suunto Race S e con file generati dai test, non con file di altre marche: se un file non viene letto, c'è sempre l'inserimento manuale.
+- **Battito al polso:** negli esercizi a corpo libero il sensore ottico perde battiti (nei file veri fino a un secondo su quattro) e può sbagliare. Per questo i battiti per giro valgono come andamento su più sessioni e non come confronto tra due giorni; una fascia toracica darebbe dati migliori.
+- **Battiti per giro:** misurano lo sforzo del cuore, non quello dei muscoli: in un circuito molto di forza dicono meno. Risentono di sonno, caldo, caffè e ora del giorno.
+- **Allenamenti dall'orologio:** l'app non sa che esercizi c'erano. Il confronto è onesto solo se dai lo stesso nome a circuiti davvero uguali. I lap sono giri solo se hai premuto Lap a ogni giro.
+- **Esercizi nuovi (1.0.5):** ripetizioni e tempi di partenza sono stimati dal test, come per gli altri; i primi allenamenti servono all'app per tararli sui tuoi tempi reali.
 - **Soglie dei livelli:** sono valori ragionevoli, non uno standard scientifico. Si ritoccano in `data/soglie-test.js`.
 - **Sagoma dei muscoli:** è volutamente schematica. Non ci sono animazioni (la struttura per aggiungerle è pronta).
 - **Un solo profilo per telefono**, come da progetto.

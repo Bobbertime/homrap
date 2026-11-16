@@ -2,14 +2,30 @@
 import { S, salva, oggi, valutazione, testIniziale, ultimoTest } from '../stato.js';
 import { t, tn, locale } from '../i18n.js';
 import { registra, disegna, vai } from '../router.js';
-import { esc, ico, foglio, barre, scintilla, lineaPunti, testoFrase, fmtPunti, fmtData, fmtDec, toast } from '../ui.js';
+import { esc, ico, foglio, barre, scintilla, lineaPunti, fmtPunti, fmtData, fmtDec, toast } from '../ui.js';
 import { giriEq, serieGiorni, miglioramento, AREE } from '../logica.js';
 import { titoloSessione } from './report.js';
-import { andamento, tendenza, bpmMassimo, caricoSettimane, avvisoCarico, recuperoBattito } from '../analisi.js';
+import { andamento, tendenza, bpmMassimo, caricoSettimane, avvisoCarico, recuperoBattito, serieDi, misuraProgressione, chiaveCircuito } from '../analisi.js';
+import { mmss } from '../util.js';
 import { daIso, isoData, meseISO } from '../util.js';
 import { barraLivello, tabellaTest } from './test.js';
 
-let tipoSel = null, confrontoDa = 'inizio', meseOff = 0;
+let tipoSel = null, confrontoDa = 'inizio', meseOff = 0, circuitoSel = null;
+const ORO = 'oro';     // scheda degli allenamenti fatti solo con l'orologio, accanto ai giorni A, B, C…
+
+// Progressione misurata su sessioni dello stesso circuito: giri (o tempo del giro) e battiti per giro, con un verdetto solo quando i dati bastano.
+function cartaMisura(serie, soloOrologio) {
+  if (!serie.length) return '';
+  const m = misuraProgressione(serie), v1 = soloOrologio ? m.ritmo : m.giri, chiave1 = soloOrologio ? 'ritmo' : 'giri', fmt1 = x => (soloOrologio ? mmss(x) : fmtDec(x));
+  const frase = (chiave, v, fmt) => t(`mis.${chiave}.${v.k}`, v.k === 'pochi' ? { n: v.n } : { a: fmt(v.prima), b: fmt(v.dopo), d: fmt(Math.abs(v.diff)), pct: fmtDec(v.pct), n: v.n });
+  const vb = m.battiti, scarse = m.punti.filter(p => p.qualita === 'scarsa').length;
+  const grafico = lineaPunti(m.punti.map(p => p.battiti), { etichetta: t('mis.grafico') });
+  return `<div class="card col"><div class="fila tra"><h3>${t('mis.titolo')}</h3><span class="pic sec">${tn('mis.sotto', serie.length, { data: fmtData(serie[0].data) })}</span></div>
+    <p class="pic"><b>${esc(frase(chiave1, v1, fmt1))}</b></p>
+    <p class="pic"><b>${esc(frase('battiti', vb, x => String(Math.round(x))))}</b>${['migliora', 'peggiora'].includes(vb.k) && vb.forza === 'indicativa' ? ' ' + t('mis.indicativa', { n: vb.n }) : ''}</p>
+    ${grafico ? `<div><span class="pic forte sec">${t('mis.grafico')}</span>${grafico}</div>` : ''}
+    ${scarse ? `<span class="pic sec">${tn('mis.scartate', scarse)}</span>` : ''}<span class="pic sec">${t('mis.nota')}</span></div>`;
+}
 const MISURE = ['peso', 'vita', 'petto', 'fianchi', 'braccio', 'coscia'];
 
 function calendario(d) {
@@ -28,8 +44,9 @@ function calendario(d) {
 
 registra('progressi', () => {
   const d = oggi(), piano = S.piano, amrap = S.sessioni.filter(s => s.tipo === 'amrap');
-  if (!amrap.length && S.test.length < 1) return { nav: true, html: `<main class="pagina"><h1>${t('prog.titolo')}</h1><div class="card bordo centro col" style="padding:32px 20px">${ico('grafico', 32)}<p class="sec">${t('prog.vuoto')}</p></div></main>` };
-  const tipi = [...new Set([...(piano ? piano.giorni.map(g => g.tipo) : []), ...amrap.map(s => s.tipoGiorno)])].sort();
+  if (!amrap.length && S.test.length < 1 && !S.sessioni.some(s => s.tipo === 'orologio')) return { nav: true, html: `<main class="pagina"><h1>${t('prog.titolo')}</h1><div class="card bordo centro col" style="padding:32px 20px">${ico('grafico', 32)}<p class="sec">${t('prog.vuoto')}</p></div></main>` };
+  const soloOro = S.sessioni.filter(s => s.tipo === 'orologio');
+  const tipi = [...new Set([...(piano ? piano.giorni.map(g => g.tipo) : []), ...amrap.map(s => s.tipoGiorno)])].sort(); if (soloOro.length) tipi.push(ORO);
   if (!tipoSel || !tipi.includes(tipoSel)) tipoSel = (amrap[amrap.length - 1] || {}).tipoGiorno || tipi[0];
   const sess = amrap.filter(s => s.tipoGiorno === tipoSel), validi = sess.filter(s => s.fattore === 1 && !s.interrotta);
   const rec = validi.slice().sort((a, b) => giriEq(b) - giriEq(a))[0], ultime = sess.slice(-8);
@@ -74,18 +91,31 @@ registra('progressi', () => {
       return `<div class="fila tra"><span style="font-weight:600">${t('prog.mis.' + k)}</span><span class="fila stretti">${scintilla(serieK, 56, 22, 'var(--txt2)')}<span class="num" style="font-size:20px">${fmtDec(u)} ${k === 'peso' ? 'kg' : 'cm'}</span>${serieK.length > 1 ? `<span class="pic sec">${diff > 0 ? '+' : ''}${fmtDec(diff)}</span>` : ''}</span></div>`; }).join('')}
       <span class="pic sec">${t('prog.misureUltima', { data: fmtData(ultM.data) })}</span></div>` : `<p class="pic sec">${t('prog.misureVuoto')}</p>`}`;
 
+  // A parità di circuito: la serie dell'ultima sessione di questo tipo di giorno
+  const ultimaDelTipo = sess.filter(s => !s.interrotta).pop(), sezMisura = ultimaDelTipo ? cartaMisura(serieDi(ultimaDelTipo, S.sessioni), false) : '';
+  // Scheda Orologio: allenamenti fatti senza l'app, raggruppati per nome di circuito
+  let sezOrologio = '';
+  if (tipoSel === ORO) {
+    const chiavi = [...new Set(soloOro.map(chiaveCircuito))], nomeDi = k => { const s = soloOro.find(x => chiaveCircuito(x) === k); return s.etichetta || t('mis.senzaNome'); };
+    if (!circuitoSel || !chiavi.includes(circuitoSel)) circuitoSel = chiaveCircuito(soloOro[soloOro.length - 1]);
+    const delCircuito = soloOro.filter(s => chiaveCircuito(s) === circuitoSel), conNome = !!delCircuito[0].etichetta;
+    sezOrologio = `<div class="col stretti"><span class="pic forte sec">${t('mis.nomi')}</span><div class="fila avvolgi stretti">${[...new Set(chiavi.map(k => (nomeDi(k) === t('mis.senzaNome') ? null : k)).filter(Boolean)), ...chiavi.filter(k => nomeDi(k) === t('mis.senzaNome'))].map(k => `<button class="chip" data-a="circuito" data-v="${esc(k)}" aria-pressed="${k === circuitoSel}">${esc(nomeDi(k))}</button>`).join('')}</div></div>
+      ${conNome ? cartaMisura(delCircuito.filter(s => !s.interrotta), true) : `<div class="card bordo sec pic">${t('mis.vuotoNome')}</div>`}
+      <div class="col stretti">${delCircuito.slice().reverse().map(s => `<a class="riga alta" href="#/report/${encodeURIComponent(s.id)}" style="text-decoration:none;color:inherit"><span class="tondo">${ico('orologio', 18)}</span><span class="cresce"><span class="forte" style="display:block">${fmtData(s.data, { weekday: 'short', day: 'numeric', month: 'long' })}</span><span class="pic sec">${fmtPunti(s.giri, s.extra)} ${t('comune.giri')}${s.orologio && s.orologio.bpmMedio ? ' · ' + s.orologio.bpmMedio + ' bpm' : ''}</span></span><span class="sec">${ico('avanti', 18)}</span></a>`).join('')}</div>`;
+  }
+  const nomeTipo = x => (x === ORO ? t('prog.tabOrologio') : t('piano.giorno', { tipo: x }));
   return {
     nav: true,
     html: `<main class="pagina"><div class="fila tra"><h1>${t('prog.titolo')}</h1><div class="pill ar" style="padding:7px 12px">${ico('fiamma', 16)}<span class="num">${serie}</span></div></div>
-      ${tipi.length ? `<div class="seg" role="group" aria-label="${t('prog.tipoGiorno')}">${tipi.map(x => `<button data-a="tipo" data-v="${x}" aria-pressed="${x === tipoSel}">${t('piano.giorno', { tipo: x })}</button>`).join('')}</div>` : ''}
-      ${rec ? `<div class="card grande tenue col stretti"><span class="pic forte art">${t('prog.record', { tipo: tipoSel })}${giorno ? ' · ' + t('piano.focus', { focus: t('focus.' + giorno.focus) }) : ''}</span>
+      ${tipi.length ? `<div class="seg" role="group" aria-label="${t('prog.tipoGiorno')}">${tipi.map(x => `<button data-a="tipo" data-v="${x}" aria-pressed="${x === tipoSel}">${nomeTipo(x)}</button>`).join('')}</div>` : ''}
+      ${tipoSel === ORO ? sezOrologio : `${rec ? `<div class="card grande tenue col stretti"><span class="pic forte art">${t('prog.record', { tipo: tipoSel })}${giorno ? ' · ' + t('piano.focus', { focus: t('focus.' + giorno.focus) }) : ''}</span>
         <div class="fila base"><span class="gigante art" style="font-size:112px">${rec.giri}</span>${rec.extra ? `<span class="grosso art">+${rec.extra}</span>` : ''}<span class="sec forte">${t('comune.giri')}</span></div>
         <span class="pic sec">${fmtData(rec.data, { day: 'numeric', month: 'long' })} · AMRAP ${rec.durata}'</span></div>` : `<div class="card bordo sec centro">${t('prog.nessunaSessione', { tipo: tipoSel })}</div>`}
       ${ultime.length ? `<div class="card col"><div class="fila tra"><h3>${tn('prog.ultime', ultime.length)}</h3><span class="pic sec">${t('prog.giriEq')}</span></div>
         ${barre(ultime.map(s => ({ v: giriEq(s), testo: fmtDec(giriEq(s)), sotto: fmtData(s.data, { day: 'numeric', month: 'numeric' }), leggero: s.fattore < 1 || s.interrotta, id: s.id,
           aria: t('rep.apriDel', { data: fmtData(s.data, { day: 'numeric', month: 'long' }) }) })), { etichetta: t('prog.giriEq'), azione: 'report' })}
         <span class="pic sec">${t('rep.toccaBarra')}${ultime.some(s => s.fattore < 1 || s.interrotta) ? ' ' + t('prog.legendaLeggere') : ''}</span></div>` : ''}
-      ${sezAndamento}
+      ${sezMisura}${sezAndamento}`}
       <div class="griglia3">${[[S.sessioni.filter(s => s.tipo !== 'test').length, t('prog.sessioni')], [totGiri, t('prog.giriTotali')], [serie, t('prog.serie')]].map(([n, l]) => `<div class="card centro" style="padding:12px 8px"><div class="medio">${n}</div><span class="pic sec">${l}</span></div>`).join('')}</div>
       ${sezCarico}
       ${sezTest}
@@ -95,14 +125,15 @@ registra('progressi', () => {
       <h2>${t('prog.calendario')}</h2>${calendario(d)}</main>`,
     azioni: {
       tipo: el => { tipoSel = el.dataset.v; disegna(); },
+      circuito: el => { circuitoSel = el.dataset.v; disegna(); },
       da: el => { confrontoDa = el.dataset.v; disegna(); },
       mese: el => { meseOff = Math.min(0, meseOff + Number(el.dataset.v)); disegna(); },
-      report: el => vai('report/' + el.dataset.v),
+      report: el => vai('report/' + encodeURIComponent(el.dataset.v)),
       giornoCal: el => {
         const del = S.sessioni.filter(s => s.tipo !== 'test' && s.data === el.dataset.v);
-        if (del.length === 1) return vai('report/' + del[0].id);
-        foglio(`<h2 style="margin:0">${t('rep.scegli')}</h2>${del.map(s => `<button class="riga alta" data-a="s" data-v="${s.id}"><span class="cresce" style="font-weight:600">${esc(titoloSessione(s))} · ${fmtPunti(s.giri, s.extra)} ${t('comune.giri')}</span><span class="sec">${ico('avanti', 18)}</span></button>`).join('')}
-          <button class="btn largo" data-a="chiudi">${t('comune.annulla')}</button>`, { s: (b, ev, chiudi) => { chiudi(); vai('report/' + b.dataset.v); } });
+        if (del.length === 1) return vai('report/' + encodeURIComponent(del[0].id));
+        foglio(`<h2 style="margin:0">${t('rep.scegli')}</h2>${del.map(s => `<button class="riga alta" data-a="s" data-v="${esc(s.id)}"><span class="cresce" style="font-weight:600">${esc(titoloSessione(s))} · ${fmtPunti(s.giri, s.extra)} ${t('comune.giri')}</span><span class="sec">${ico('avanti', 18)}</span></button>`).join('')}
+          <button class="btn largo" data-a="chiudi">${t('comune.annulla')}</button>`, { s: (b, ev, chiudi) => { chiudi(); vai('report/' + encodeURIComponent(b.dataset.v)); } });
       },
       misura: () => {
         foglio(`<h2 style="margin:0">${t('prog.nuovaMisura')}</h2><p class="pic sec">${t('prog.misuraTesto')}</p>

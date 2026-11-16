@@ -9,7 +9,7 @@ import { analizza, CONFINI_ZONE } from '../analisi.js';
 import { mmss } from '../util.js';
 import { immagineReport } from '../immagini.js';
 
-export const titoloSessione = s => s.tipo === 'sfida' ? t('all.sfida', { mese: fmtData(s.data, { month: 'long' }) }) : t('piano.giorno', { tipo: s.tipoGiorno });
+export const titoloSessione = s => s.tipo === 'orologio' ? (s.etichetta || t('rep.soloOrologio')) : s.tipo === 'sfida' ? t('all.sfida', { mese: fmtData(s.data, { month: 'long' }) }) : t('piano.giorno', { tipo: s.tipoGiorno });
 const segno = (n, testo) => (n > 0 ? '+' : n < 0 ? '−' : '') + testo;
 const perc = v => segno(Math.round(v * 100), Math.abs(Math.round(v * 100)) + '%');
 
@@ -75,6 +75,7 @@ function tabellaConfronto(s, cf) {
   if (cf.mediaGiro) righe.push(riga(t('rep.righe.mediaGiro'), mmss(cf.mediaGiro.prima), mmss(cf.mediaGiro.ora), segno(Math.round(cf.mediaGiro.diff), Math.abs(Math.round(cf.mediaGiro.diff)) + ' s')));
   if (cf.calo) righe.push(riga(t('rep.righe.calo'), perc(cf.calo.prima), perc(cf.calo.ora), ''));
   if (cf.bpm) righe.push(riga(t('rep.righe.bpm'), cf.bpm.prima, cf.bpm.ora, segno(cf.bpm.diff, Math.abs(cf.bpm.diff))));
+  if (cf.battiti) righe.push(riga(t('rep.righe.battiti'), cf.battiti.prima, cf.battiti.ora, segno(cf.battiti.diff, Math.abs(cf.battiti.diff))));
   if (cf.fatica) righe.push(riga(t('rep.righe.fatica'), cf.fatica.prima, cf.fatica.ora, segno(cf.fatica.diff, Math.abs(cf.fatica.diff))));
   return `<table class="tab conf"><thead><tr><th></th><th>${fmtData(cf.data)}</th><th>${fmtData(s.data)}</th><th>${t('rep.diff')}</th></tr></thead><tbody>${righe.join('')}</tbody></table>`;
 }
@@ -82,7 +83,11 @@ function tabellaConfronto(s, cf) {
 registra('report', ([id]) => {
   const s = S.sessioni.find(x => x.id === id);
   if (!s || s.tipo === 'test') return { html: '', dopo: () => vai('progressi', true) };
-  const a = analizza(s, S.sessioni, S.profilo || {}), g = a.giri, c = a.cuore, cf = a.confronto, max = a.max;
+  const a = analizza(s, S.sessioni, S.profilo || {}), g = a.giri, c = a.cuore, cf = a.confronto, max = a.max, bg = a.battitiGiro, soloOro = s.tipo === 'orologio';
+  // Battiti per giro: il numero, da quanti giri viene e quanto è affidabile il sensore in questa sessione
+  const sezBattiti = bg ? `<div class="stat"><span>${t('rep.battitiGiro')}</span><span class="num">${bg.valore}</span></div>
+      <span class="pic sec">${t('rep.battitiGiroNota')}${bg.copertura != null ? ' ' + t('rep.sensore', { pct: Math.round(bg.copertura * 100) }) : ''}${bg.scartati ? ' ' + tn('rep.giriScartati', bg.scartati) : ''}</span>
+      ${bg.usabile ? '' : `<span class="pic forte">${t('rep.sensoreScarso')}</span>`}` : '';
   const tessera = (v, l, piccolo = '') => `<div class="card centro" style="padding:12px 6px"><div class="medio">${v}${piccolo ? `<span style="font-size:18px"> ${piccolo}</span>` : ''}</div><span class="pic sec">${l}</span></div>`;
   const tessere = [tessera(s.giri, t('rep.giri'), s.extra ? '+' + s.extra : ''), tessera(a.mediaGiro ? mmss(a.mediaGiro) : '—', t('rep.mediaGiro')), tessera(s.fatica != null ? s.fatica : '—', t('rep.fatica'), s.fatica != null ? '/10' : '')];
   if (c) tessere.push(tessera(c.medio != null ? c.medio : '—', t('rep.bpmMedio')), tessera(c.picco != null ? c.picco : '—', t('rep.bpmMax')), tessera(c.calorie != null ? c.calorie : '—', t('rep.kcal')));
@@ -94,8 +99,8 @@ registra('report', ([id]) => {
       <div class="stat"><span>${t('rep.veloce', { n: g.iMin + 1 })}</span><span class="num">${mmss(g.min)}</span></div>
       <div class="stat"><span>${t('rep.lento', { n: g.iMax + 1 })}</span><span class="num">${mmss(g.max)}</span></div>
       <div class="stat"><span>${t('rep.primiUltimi')}</span><span class="num">${mmss(g.primi)} → ${mmss(g.ultimi)} <span class="${g.calo >= 0.08 ? '' : 'sec'}" style="font-size:16px">${perc(g.calo)}</span></span></div>
-      ${a.bpmGiri ? `<span class="pic sec">${t('rep.bpmGiro')}</span>` : ''}</div>`
-    : `<div class="card col stretti"><h3>${t('rep.tempiGiro')}</h3><p class="pic sec">${g && g.n === 1 ? t('rep.unGiro', { t: mmss(g.min) }) : t('rep.senzaGiri')}</p></div>`;
+      ${a.bpmGiri ? `<span class="pic sec">${t('rep.bpmGiro')}</span>` : ''}${sezBattiti}</div>`
+    : `<div class="card col stretti"><h3>${t('rep.tempiGiro')}</h3><p class="pic sec">${g && g.n === 1 ? t('rep.unGiro', { t: mmss(g.min) }) : t('rep.senzaGiri')}</p>${sezBattiti}</div>`;
 
   const sezZone = c && c.zone ? `<div class="card col"><h3>${t('rep.zone')}</h3>${righeZone(c.zone, max.valore)}${notaMax}</div>`
     : c && c.quota != null ? `<div class="card col stretti"><h3>${t('rep.zone')}</h3><p>${t('rep.zoneSoloMedia', { bpm: c.medio, pct: Math.round(c.quota * 100), z: c.zonaMedia, nome: t('rep.zona.' + c.zonaMedia).toLowerCase() })}</p>${notaMax}</div>`
@@ -105,8 +110,8 @@ registra('report', ([id]) => {
     html: `<main class="pagina piena">
       <div class="fila"><button class="ico-btn" data-a="indietro" aria-label="${t('comune.indietro')}">${ico('indietro')}</button><h1 class="cresce" style="font-size:24px">${t('rep.titolo')}</h1>
         <button class="ico-btn" data-a="condividi" aria-label="${t('rep.condividiAria')}">${ico('condividi')}</button></div>
-      <div><span class="pic forte sec">${esc(titoloSessione(s))} · AMRAP ${s.durata}' · ${fmtData(s.data, { weekday: 'short', day: 'numeric', month: 'long' })}</span>
-        <div class="fila avvolgi stretti" style="margin-top:8px">${s.focus ? `<span class="pill ar">${t('piano.focus', { focus: t('focus.' + s.focus) })}</span>` : ''}<span class="pill">${tn('oggi.obiettivo', s.obiettivo)}</span>${s.motivo ? `<span class="pill">${t('oggi.motivo.' + s.motivo)}</span>` : ''}${s.interrotta ? `<span class="pill">${t('rep.interrotta')}</span>` : ''}</div></div>
+      <div><span class="pic forte sec">${esc(titoloSessione(s))} · ${soloOro ? s.durata + ' min' : `AMRAP ${s.durata}'`} · ${fmtData(s.data, { weekday: 'short', day: 'numeric', month: 'long' })}</span>
+        <div class="fila avvolgi stretti" style="margin-top:8px">${s.focus ? `<span class="pill ar">${t('piano.focus', { focus: t('focus.' + s.focus) })}</span>` : ''}${soloOro ? `<span class="pill ar">${t('rep.soloOrologio')}</span>` : ''}${s.obiettivo ? `<span class="pill">${tn('oggi.obiettivo', s.obiettivo)}</span>` : ''}${s.motivo ? `<span class="pill">${t('oggi.motivo.' + s.motivo)}</span>` : ''}${s.interrotta ? `<span class="pill">${t('rep.interrotta')}</span>` : ''}</div></div>
       <div class="griglia3">${tessere.join('')}</div>
       <div class="card tenue avviso"><span class="tondo">${ico('lampadina')}</span><div class="col stretti cresce"><h3>${t('rep.lettura')}</h3>
         <ul class="punti">${a.frasi.map(f => `<li>${esc(testoFrase(f))}</li>`).join('')}</ul><p class="pic sec">${t('rep.letturaNota')}</p></div></div>
@@ -114,7 +119,7 @@ registra('report', ([id]) => {
         ${c.deriva != null ? `<div class="stat"><span>${t('rep.deriva')}</span><span class="num">${segno(c.deriva, Math.abs(c.deriva))} bpm</span></div>` : ''}</div>` : ''}
       ${sezGiri}${sezZone}
       <div class="card col"><h3>${t('rep.confronto')}</h3>
-        ${cf ? `${tabellaConfronto(s, cf)}${cf.circuitoDiverso ? `<p class="pic sec">${t('rep.circuitoDiverso')}</p>` : ''}<a class="btn piccolo" href="#/report/${cf.id}" style="align-self:flex-start">${t('rep.apriPrecedente')}</a>` : `<p class="pic sec">${t('rep.primaVolta')}</p>`}</div>
+        ${cf ? `${tabellaConfronto(s, cf)}${cf.circuitoDiverso ? `<p class="pic sec">${t('rep.circuitoDiverso')}</p>` : ''}<a class="btn piccolo" href="#/report/${encodeURIComponent(cf.id)}" style="align-self:flex-start">${t('rep.apriPrecedente')}</a>` : `<p class="pic sec">${t('rep.primaVolta')}</p>`}</div>
       ${c && c.curva ? '' : `<div class="card avviso"><span class="tondo">${ico('orologio')}</span><div class="col stretti cresce"><h3>${t('rep.aggiungiOrologio')}</h3><p class="pic sec">${t('rep.aggiungiOrologioTesto')}</p>
         <a class="btn piccolo" href="#/orologi" style="align-self:flex-start;margin-top:4px">${t('oro.importa')}</a></div></div>`}
       ${s.note || (s.fastidi || []).length ? `<div class="card col stretti"><h3>${t('rep.note')}</h3>${s.note ? `<p style="white-space:pre-wrap">${esc(s.note)}</p>` : ''}
@@ -129,6 +134,7 @@ registra('report', ([id]) => {
           <div class="griglia2"><label class="campo">${t('fine.giri')}<input type="number" inputmode="numeric" min="0" max="99" data-k="giri" value="${s.giri}"></label>
             <label class="campo">${t('rep.extra')}<input type="number" inputmode="numeric" min="0" data-k="extra" value="${s.extra || 0}"></label></div>
           <label class="campo">${t('fine.fatica')}<input type="number" inputmode="numeric" min="1" max="10" data-k="fatica" value="${s.fatica != null ? s.fatica : ''}"></label>
+          ${soloOro ? `<label class="campo">${t('rep.etichetta')}<input data-k="etichetta" maxlength="30" value="${esc(s.etichetta || '')}"></label><p class="pic sec">${t('oro.nomeNota')}</p>` : ''}
           <label class="campo">${t('fine.note')}<textarea data-k="note">${esc(s.note || '')}</textarea></label>
           <button class="btn primario largo" data-a="ok">${t('comune.salva')}</button><button class="btn largo" data-a="chiudi">${t('comune.annulla')}</button>`,
         { ok: async (b, ev, chiudi, velo) => {
@@ -137,6 +143,7 @@ registra('report', ([id]) => {
           if (!intero(giri, 0, 99) || !intero(extra, 0, s.ripGiro ? s.ripGiro - 1 : 999) || (fatica != null && !intero(fatica, 1, 10))) return toast(t('rep.correggiErrore', { max: s.ripGiro ? s.ripGiro - 1 : 999 }));
           if (extra !== (s.extra || 0)) delete s.extraPer;
           Object.assign(s, { giri, extra, note: val('note').trim(), corretta: true }); if (fatica != null) s.fatica = fatica;
+          if (soloOro) s.etichetta = val('etichetta').trim().slice(0, 30);
           await salvaSessione(s); chiudi(); toast(t('comune.salvato')); disegna();
         } });
       },

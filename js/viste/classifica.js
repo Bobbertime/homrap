@@ -2,8 +2,8 @@
 import { S, salva, oggi } from '../stato.js';
 import { t, tn } from '../i18n.js';
 import { registra, vai, disegna } from '../router.js';
-import { esc, ico, foglio, toast, avatar, scintilla, dueLinee, fmtPunti, fmtData, fmtDec, copiaTesto, condividiTesto, condividiFile, interruttore } from '../ui.js';
-import { datiPersonali, creaCodice, leggiCodice, estraiCodici, unisci, graduatorie, momenti, mediaGruppo, frasiConfronto, chiavePeriodo, sfidaEq, provaEq, sfidaDelMese } from '../classifica.js';
+import { esc, ico, foglio, toast, avatar, scintilla, dueLinee, fmtPunti, fmtData, copiaTesto, condividiTesto, condividiFile, interruttore } from '../ui.js';
+import { datiPersonali, creaCodice, leggiCodice, estraiCodici, unisci, graduatorie, momenti, mediaGruppo, frasiConfronto, chiavePeriodo, provaEq, sfidaDelMese, normalizzaMembro, periodoValido } from '../classifica.js';
 import { PROVE } from '../../data/soglie-test.js';
 import { mmss, meseISO } from '../util.js';
 import { immagineClassifica } from '../immagini.js';
@@ -18,8 +18,9 @@ export function gruppo() {
   const d = oggi(), tipo = S.classifica.periodo, chiave = chiavePeriodo(tipo, d), io = mio(tipo);
   let altri = {};
   const g = S.classifica.gruppo, buono = c => c && c.p && c.p.t === tipo && c.p.k === chiave;
-  if (buono(g)) for (const m of g.m) altri[m.id] = m;
-  altri = unisci(altri, Object.values(S.classifica.codici).filter(buono));
+  const puliti = lista => (Array.isArray(lista) ? lista : []).map(normalizzaMembro).filter(Boolean);   // anche i codici già salvati passano dal filtro
+  if (buono(g)) for (const m of puliti(g.m)) altri[m.id] = m;
+  altri = unisci(altri, puliti(Object.values(S.classifica.codici).filter(buono)));
   delete altri[S.io.id];
   const visti = Object.entries(S.classifica.membri).filter(([id]) => id !== S.io.id);
   return { io, lista: [io, ...Object.values(altri)], mancanti: visti.filter(([id]) => !altri[id]).map(([id, m]) => ({ id, ...m })), ricevuti: Object.keys(altri).length, totale: visti.length, tipo, chiave };
@@ -30,8 +31,9 @@ async function incolla(testo) {
   for (const c of codici) {
     try {
       const { tipo, dati } = await leggiCodice(c);
-      const lista = tipo === 'gruppo' ? dati.m : [dati];
-      if (tipo === 'gruppo') { S.classifica.gruppo = dati; S.classifica.periodo = dati.p.t; }
+      const lista = (tipo === 'gruppo' ? (Array.isArray(dati.m) ? dati.m : []) : [dati]).map(normalizzaMembro).filter(Boolean);
+      if (!lista.length || (tipo === 'gruppo' && !periodoValido(dati.p))) throw new Error('contenuto');
+      if (tipo === 'gruppo') { S.classifica.gruppo = { v: 1, p: { t: dati.p.t, k: dati.p.k }, ts: Number(dati.ts) || 0, m: lista }; S.classifica.periodo = dati.p.t; }
       else S.classifica.codici = unisci(S.classifica.codici, lista);
       for (const m of lista) S.classifica.membri[m.id] = { n: m.n, in: m.in, c: m.c };
       buoni++;
@@ -90,6 +92,7 @@ registra('classifica', () => {
         <button class="btn primario largo" data-a="ok">${t('cla.leggi')}</button><button class="btn largo" data-a="chiudi">${t('comune.annulla')}</button>`,
       { ok: async (el, ev, chiudi, velo) => { await incolla(velo.querySelector('textarea').value); chiudi(); disegna(); } }, { fuoco: true }),
       condividi: () => {
+        if (S.stato.demo) return toast(t('demo.bloccato'));   // nella demo i risultati sono finti: non si mandano agli amici
         let dettagli = true, codice = '';
         const corpo = () => `<h2 style="margin:0">${t('cla.condividiMiei')}</h2><p class="sec pic">${t('cla.anteprimaTesto', { periodo: nomePeriodo(G.tipo, d) })}</p>
           <div class="card col stretti"><ul class="punti pic">${t('cla.contieneBase').map(x => `<li>${x}</li>`).join('')}${dettagli ? t('cla.contieneDettagli').map(x => `<li>${x}</li>`).join('') : ''}</ul></div>
@@ -105,6 +108,7 @@ registra('classifica', () => {
         crea(f.el);
       },
       pubblica: () => {
+        if (S.stato.demo) return toast(t('demo.bloccato'));
         if (solo) return toast(t('cla.pubblicaVuoto'));
         foglio(`<h2 style="margin:0">${t('cla.pubblica')}</h2><p class="sec pic">${t('cla.pubblicaTesto')}</p>
           <button class="btn primario largo" data-a="testo">${ico('nota')}${t('cla.pubTesto')}</button><button class="btn largo" data-a="img">${ico('condividi')}${t('cla.pubImmagine')}</button><button class="btn largo" data-a="cod">${ico('copia')}${t('cla.pubCodice')}</button>
@@ -135,7 +139,7 @@ registra('confronto', ([id]) => {
   const dett = lui.an || lui.te;
   return {
     html: `<main class="pagina piena">
-      <div class="fila"><a class="ico-btn" href="#/classifica" aria-label="${t('comune.indietro')}">${ico('indietro')}</a><h1 style="font-size:24px">${t('conf.titolo')}</h1></div>
+      <div class="fila"><a class="ico-btn" data-indietro href="#/classifica" aria-label="${t('comune.indietro')}">${ico('indietro')}</a><h1 style="font-size:24px">${t('conf.titolo')}</h1></div>
       <div class="card grande"><div class="fila tra"><div class="col stretti" style="align-items:center;flex:1">${avatar(io.in, io.c, 56)}<span class="forte">${t('cla.tu')}</span><span class="grosso art">${io.sf ? fmtPunti(io.sf.g, io.sf.r) : '—'}</span></div>
         <span class="sec forte pic">${t('conf.sfida')}</span>
         <div class="col stretti" style="align-items:center;flex:1">${avatar(lui.in, lui.c, 56)}<span class="forte">${esc(lui.n)}</span><span class="grosso">${lui.sf ? fmtPunti(lui.sf.g, lui.sf.r) : '—'}</span></div></div></div>

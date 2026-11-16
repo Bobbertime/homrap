@@ -77,12 +77,16 @@ export function toast(msg) {
   document.body.appendChild(el);
   clearTimeout(timerToast); timerToast = setTimeout(() => el.remove(), 2600);
 }
+const fogliAperti = new Set();
+// Chiude tutti i fogli aperti: lo chiama il router quando si cambia pagina (per esempio con il tasto indietro).
+export const chiudiFogli = () => [...fogliAperti].forEach(c => c());
 // Foglio dal basso. azioni: { nome: (elemento, evento, chiudi) => … } collegate agli attributi data-a.
 export function foglio(html, azioni = {}, opz = {}) {
   const velo = document.createElement('div');
   velo.className = 'velo';
   velo.innerHTML = `<div class="foglio" role="dialog" aria-modal="true">${html}</div>`;
-  const chiudi = v => { velo.remove(); if (opz.allaChiusura) opz.allaChiusura(v); };
+  const chiudi = v => { if (!fogliAperti.has(chiudi)) return; fogliAperti.delete(chiudi); velo.remove(); if (opz.allaChiusura) opz.allaChiusura(v); };
+  fogliAperti.add(chiudi);
   velo.addEventListener('click', ev => {
     if (ev.target === velo && !opz.bloccato) return chiudi();
     const el = ev.target.closest('[data-a]');

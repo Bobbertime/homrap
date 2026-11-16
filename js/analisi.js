@@ -81,13 +81,18 @@ export function analisiCuore(s, max) {
 }
 
 // ───────────────────────── Giri
+// I lap dell'orologio che sono giri completi: tutti meno l'ultimo, chiuso dallo stop. In un allenamento fatto solo con
+// l'orologio (tipo "orologio") l'utente può dire che anche l'ultimo lap è un giro intero: allora i giri sono quanti i lap.
+export function lapCompleti(s) {
+  const lap = s.orologio && Array.isArray(s.orologio.giri) ? s.orologio.giri : [];
+  return s.tipo === 'orologio' && s.giri >= lap.length ? lap : lap.slice(0, -1);
+}
 // I tempi dei giri: quelli presi dall'app; se mancano (allenamento fatto con l'orologio) i lap del file,
 // senza l'ultimo, che è il giro incompleto chiuso dallo stop.
 export function tempiGiriDi(s) {
   const app = (s.tempiGiro || []).filter(x => x > 0);
   if (app.length) return { tempi: app, fonte: 'app' };
-  const lap = s.orologio && Array.isArray(s.orologio.giri) ? s.orologio.giri.map(g => g.durata) : [];
-  const completi = lap.slice(0, -1).filter(x => x > 0);
+  const completi = lapCompleti(s).map(g => (numero(g.timer) && g.timer > 0 ? g.timer : g.durata)).filter(x => x > 0);   // senza le pause, se l'orologio le dice
   return completi.length ? { tempi: completi, fonte: 'orologio' } : { tempi: [], fonte: null };
 }
 // calo: quanto sono più lenti gli ultimi giri rispetto ai primi (primo e ultimo terzo); 0,10 = +10% di tempo a giro.
@@ -111,6 +116,13 @@ export function mediaGiroDi(s) {
 // Con i giri dell'app la curva viene allineata con l'ora di inizio (se la differenza è entro 15 minuti).
 export function bpmPerGiro(s, tempi, fonte) {
   const o = s.orologio;
+  if (o && fonte === 'orologio') {      // lap dell'orologio: battito medio e confini li dice il file
+    const lap = lapCompleti(s), curva = Array.isArray(o.curva) ? o.curva : [];
+    if (!lap.length) return null;
+    let t = 0; const inizi = lap.map(g => { const d0 = numero(g.da) ? g.da : t; t = d0 + g.durata; return d0; });
+    const bpm = lap.map((g, i) => { if (bpmValido(g.bpm)) return g.bpm; const v = curva.filter(p => p[0] >= inizi[i] && p[0] < inizi[i] + g.durata).map(p => p[1]); return v.length ? Math.round(media(v)) : null; });
+    return bpm.some(v => v != null) ? { bpm, confini: [...inizi, inizi[inizi.length - 1] + lap[lap.length - 1].durata] } : null;
+  }
   if (!o || !Array.isArray(o.curva) || o.curva.length < 2 || !tempi || !tempi.length) return null;
   let da = 0;
   if (fonte === 'app' && s.inizio && o.inizio) { const d = (s.inizio - o.inizio) / 1000; if (Math.abs(d) <= 900) da = d; }
@@ -122,16 +134,26 @@ export function bpmPerGiro(s, tempi, fonte) {
 // ───────────────────────── Confronto con la sessione precedente dello stesso tipo di giorno
 export function precedente(s, sessioni = []) {
   const stesso = x => x.id !== s.id && x.ts < s.ts && x.tipo === s.tipo && !x.interrotta &&
-    (s.tipo === 'sfida' ? x.meseSfida === s.meseSfida && x.variante === s.variante : x.tipoGiorno === s.tipoGiorno);
+    (s.tipo === 'sfida' ? x.meseSfida === s.meseSfida && x.variante === s.variante : s.tipo === 'orologio' ? chiaveCircuito(x) === chiaveCircuito(s) : x.tipoGiorno === s.tipoGiorno);
   return sessioni.filter(stesso).sort((a, b) => a.ts - b.ts).pop() || null;
 }
 const firma = s => [s.durata, s.fattore == null ? 1 : s.fattore, ...(s.esercizi || []).map(e => `${e.id}:${e.q}:${e.kg == null ? '' : e.kg}`)].join('|');
+// Chiave del circuito: due sessioni si possono confrontare davvero solo se hanno la stessa chiave.
+// Allenamento del piano: stesso giorno, stessi esercizi, ripetizioni, kg, durata e riduzione. Sfida: stesso mese e variante.
+// Allenamento fatto solo con l'orologio: stesso nome di circuito scelto dall'utente (senza nome non si confronta con niente).
+export function chiaveCircuito(s) {
+  if (s.tipo === 'orologio') { const e = String(s.etichetta || '').trim().toLowerCase(); return e ? 'O|' + e : 'O#' + s.id; }
+  if (s.tipo === 'sfida') return `S|${s.meseSfida}|${s.variante}`;
+  return `A|${s.tipoGiorno}|${firma(s)}`;
+}
+export const serieDi = (s, sessioni = []) => sessioni.filter(x => !x.interrotta && x.tipo === s.tipo && chiaveCircuito(x) === chiaveCircuito(s)).sort((a, b) => a.ts - b.ts);
 const coppia = (ora, prima) => (numero(ora) && numero(prima) ? { ora, prima, diff: ora - prima } : null);
 export function confronta(s, p, max) {
   if (!p) return null;
   const eq = giriEq(s), eqP = giriEq(p), g = analisiGiri(tempiGiriDi(s).tempi), gP = analisiGiri(tempiGiriDi(p).tempi);
   const c = analisiCuore(s, max), cP = analisiCuore(p, max);
-  return { id: p.id, data: p.data, circuitoDiverso: firma(s) !== firma(p),
+  const b = battitiPerGiro(s), bP = battitiPerGiro(p);
+  return { id: p.id, data: p.data, circuitoDiverso: chiaveCircuito(s) !== chiaveCircuito(p), battiti: b && bP && b.usabile && bP.usabile ? coppia(b.valore, bP.valore) : null,
     giri: coppia(eq, eqP), mediaGiro: coppia(mediaGiroDi(s), mediaGiroDi(p)),
     calo: g && gP ? coppia(g.calo, gP.calo) : null, bpm: c && cP ? coppia(c.medio, cP.medio) : null,
     fatica: coppia(s.fatica, p.fatica), precGiri: p.giri, precExtra: p.extra || 0 };
@@ -154,10 +176,14 @@ function fraseCuore(c, g) {
   if (g && g.andamento === 'costante' && c.deriva != null && c.deriva >= S.deriva) return { k: 'deriva', par: { bpm: c.deriva } };
   return { k: c.quota >= CONFINI_ZONE[2] ? 'cuoreAlto' : c.quota >= CONFINI_ZONE[1] ? 'cuoreMedio' : 'cuoreBasso', par };
 }
-function fraseConfronto(cf) {
+function fraseConfronto(cf, s) {
   if (!cf) return { k: 'primaVolta', par: {} };
   const S = SOGLIE_REPORT, data = cf.data;
   if (cf.circuitoDiverso) return { k: 'circuitoCambiato', par: { data } };
+  if (s && s.tipo === 'orologio') {     // solo orologio: la durata registrata cambia, quindi si confronta il tempo del giro, non il numero di giri
+    const d = cf.mediaGiro ? Math.round(cf.mediaGiro.diff) : 0;
+    return Math.abs(d) < 5 ? { k: 'stabile', par: { data } } : { k: d < 0 ? 'giroPiuVeloce' : 'giroPiuLento', par: { data, sec: Math.abs(d) } };
+  }
   const dg = cf.giri ? cf.giri.diff : 0, db = cf.bpm ? cf.bpm.diff : null, giri = arrot1(Math.abs(dg));
   if (dg >= S.giri) return db != null && db <= -S.bpm ? { k: 'meglioMenoBattito', par: { data, giri, bpm: Math.round(-db) } } : { k: 'piuGiri', par: { data, giri } };
   if (dg <= -S.giri) return { k: 'menoGiri', par: { data, giri } };
@@ -182,11 +208,55 @@ export function lettura(s, { giri, cuore, confronto }) {
   metti(fraseRitmo(giri));
   metti(fraseCuore(cuore, giri));
   if (out.length < 2) metti(fraseSensazione(s, cuore));
-  metti(fraseConfronto(confronto));
+  metti(fraseConfronto(confronto, s));
   if (!cuore) metti(fraseObiettivo(s));
   metti(fraseSensazione(s, cuore));
   if (out.length < 2) metti(fraseObiettivo(s));
   return out.filter((f, i) => out.findIndex(x => x.k === f.k) === i);
+}
+
+// ───────────────────────── Battiti per giro: quanti battiti costa in media un giro completo
+// = battito medio del giro × durata del giro. A parità di circuito, meno battiti per giro = più efficienza.
+// Si usano solo dati misurati: i giri dell'app con la curva allineata, oppure i lap dell'orologio con il loro battito medio.
+// I giri con una pausa dentro si scartano; se il sensore ha perso troppi battiti la sessione non entra nell'andamento.
+export const SOGLIE_MISURA = { coperturaBuona: 0.9, coperturaMinima: 0.7, pausaGiro: 10, variazione: 0.05, ritmo: 0.03, giri: 0.25, minBattiti: 3, attendibile: 4 };
+export function battitiPerGiro(s) {
+  const o = s.orologio; if (!o) return null;
+  const S = SOGLIE_MISURA, { tempi, fonte } = tempiGiriDi(s);
+  let giri = [], origine = null;
+  if (fonte === 'app') { const b = bpmPerGiro(s, tempi, 'app'); if (b) { giri = tempi.map((sec, i) => ({ sec, bpm: b.bpm[i] })); origine = 'app'; } }
+  else if (fonte === 'orologio') {
+    const curva = Array.isArray(o.curva) ? o.curva : [];
+    giri = lapCompleti(s).map((g, i, tutti) => { const da = numero(g.da) ? g.da : tutti.slice(0, i).reduce((t, x) => t + x.durata, 0);
+      const dentro = curva.filter(p => p[0] >= da && p[0] < da + g.durata).map(p => p[1]);
+      return { sec: numero(g.timer) ? g.timer : g.durata, bpm: bpmValido(g.bpm) ? g.bpm : dentro.length ? Math.round(media(dentro)) : null, pausa: numero(g.timer) ? g.durata - g.timer : 0 }; });
+    origine = 'lap';
+  }
+  const scartati = giri.filter(g => (g.pausa || 0) > S.pausaGiro).length, buoni = giri.filter(g => bpmValido(g.bpm) && g.sec > 0 && (g.pausa || 0) <= S.pausaGiro);
+  let valore = buoni.length ? media(buoni.map(g => g.bpm * g.sec / 60)) : null;
+  if (valore == null && !giri.length && s.tipo !== 'orologio' && !s.interrotta && bpmValido(o.bpmMedio) && giriEq(s) > 0) { valore = o.bpmMedio * s.durata / giriEq(s); origine = 'media'; }   // senza giri cronometrati: media della sessione
+  if (valore == null) return null;
+  const copertura = numero(o.copertura) ? o.copertura : null;
+  const qualita = copertura != null && copertura < S.coperturaMinima ? 'scarsa' : origine === 'media' || copertura == null || copertura < S.coperturaBuona ? 'discreta' : 'buona';
+  return { valore: Math.round(valore), giri: buoni.length, scartati, origine, copertura, qualita, usabile: qualita !== 'scarsa' };
+}
+// Verdetto su una serie di valori in ordine di tempo: confronta la media della prima metà con quella della seconda.
+// k: 'pochi' (dati insufficienti), 'stabile' (differenza sotto soglia), 'migliora', 'peggiora'.
+function verdetto(valori, { bassoMeglio = false, soglia, relativa = false, min = 2, attendibile = 0 }) {
+  const v = valori.filter(numero), n = v.length;
+  if (n < min) return { k: 'pochi', n, servono: min };
+  const m = Math.max(1, Math.floor(n / 2)), prima = media(v.slice(0, m)), dopo = media(v.slice(-m)), diff = dopo - prima, rel = prima ? diff / prima : 0;
+  const passa = relativa ? Math.abs(rel) >= soglia : Math.abs(diff) >= soglia;
+  return { k: !passa ? 'stabile' : (diff < 0) === bassoMeglio ? 'migliora' : 'peggiora', n, prima, dopo, diff, pct: Math.round(Math.abs(rel) * 1000) / 10, forza: n >= attendibile ? 'attendibile' : 'indicativa' };
+}
+// Progressione misurata su una serie di sessioni dello stesso circuito (vedi serieDi).
+export function misuraProgressione(serie = []) {
+  const S = SOGLIE_MISURA;
+  const punti = serie.map(s => { const b = battitiPerGiro(s); return { id: s.id, data: s.data, eq: giriEq(s), mediaGiro: mediaGiroDi(s), battiti: b && b.usabile ? b.valore : null, qualita: b ? b.qualita : null, copertura: b ? b.copertura : null, scartati: b ? b.scartati : 0 }; });
+  return { punti,
+    giri: verdetto(punti.map(p => p.eq), { soglia: S.giri, min: 2 }),
+    ritmo: verdetto(punti.map(p => p.mediaGiro), { bassoMeglio: true, soglia: S.ritmo, relativa: true, min: 2 }),
+    battiti: verdetto(punti.map(p => p.battiti), { bassoMeglio: true, soglia: S.variazione, relativa: true, min: S.minBattiti, attendibile: S.attendibile }) };
 }
 
 // ───────────────────────── Tutto insieme
@@ -195,7 +265,7 @@ export function analizza(s, sessioni = [], profilo = {}) {
   const giri = analisiGiri(tempi), cuore = analisiCuore(s, max.valore), prec = precedente(s, sessioni);
   const confronto = confronta(s, prec, max.valore);
   return { max, giri, fonteGiri: fonte, bpmGiri: bpmPerGiro(s, tempi, fonte), cuore, prec, confronto, eq: giriEq(s),
-    mediaGiro: mediaGiroDi(s), frasi: lettura(s, { giri, cuore, confronto }) };
+    mediaGiro: mediaGiroDi(s), battitiGiro: battitiPerGiro(s), frasi: lettura(s, { giri, cuore, confronto }) };
 }
 
 // ───────────────────────── Andamento nel tempo (scheda Progressi)
@@ -220,7 +290,7 @@ export function tendenza(punti = []) {
 
 // ───────────────────────── Carico della settimana: minuti di allenamento × fatica segnata (5 se manca)
 export const SOGLIE_CARICO = { salita: 1.3, settimane: 3, fatica: 8 };
-const allenamento = s => s.tipo === 'amrap' || s.tipo === 'sfida';
+const allenamento = s => s.tipo === 'amrap' || s.tipo === 'sfida' || s.tipo === 'orologio';
 function minutiDi(s) {
   const giri = (s.tempiGiro || []).reduce((a, b) => a + b, 0);
   return s.interrotta && giri > 0 ? giri / 60 : s.durata || 0;

@@ -160,11 +160,11 @@ export async function immagineReport(s, a, { titolo, conBattito = true } = {}) {
   await fontPronti();
   const [c, x] = tela(), g = a.giri, cuore = conBattito ? a.cuore : null;
   intestazione(x, fmtData(s.data, { day: 'numeric', month: 'long', year: 'numeric' }));
-  scrivi(x, [t('rep.titolo'), titolo, `AMRAP ${s.durata}'`].filter(Boolean).join(' · '), 80, 290, F(700, 40), C.txt2, 'left', W - 160);
+  scrivi(x, [t('rep.titolo'), titolo, s.tipo === 'orologio' ? `${s.durata} min` : `AMRAP ${s.durata}'`].filter(Boolean).join(' · '), 80, 290, F(700, 40), C.txt2, 'left', W - 160);
   // Card dei giri
   rett(x, 60, 330, 960, 280, 64, C.ar);
   scrivi(x, t('img.giri'), 120, 408, F(800, 40), C.su);
-  scrivi(x, tn('oggi.obiettivo', s.obiettivo), 960, 408, F(700, 34), C.su, 'right');
+  if (s.obiettivo) scrivi(x, tn('oggi.obiettivo', s.obiettivo), 960, 408, F(700, 34), C.su, 'right');
   const w = scrivi(x, String(s.giri), 110, 584, FN(800, 220), C.su);
   if (s.extra) scrivi(x, `+${s.extra} ${t('img.rip')}`, 110 + w + 28, 584, FN(800, 90), C.su);
   // Numeri in evidenza

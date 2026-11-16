@@ -92,6 +92,26 @@ export function datiPersonali({ io, sessioni, test, perSettimana }, { tipo = 'm'
   }
   return d;
 }
+// I codici arrivano da fuori (WhatsApp): prima di usarli si tengono solo i campi previsti, del tipo e nei limiti previsti.
+// Un codice scritto a mano o rovinato non può così portare testo o numeri strani nelle schermate. Restituisce null se manca id o nome.
+const num = (v, lo, hi) => (typeof v === 'number' && isFinite(v) && v >= lo && v <= hi ? v : null);
+export const periodoValido = p => !!p && (p.t === 'm' || p.t === 'w') && typeof p.k === 'string' && /^\d{4}-(W\d{2}|\d{2})$/.test(p.k);
+export function normalizzaMembro(m) {
+  if (!m || typeof m !== 'object') return null;
+  const id = typeof m.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(m.id) ? m.id : null, n = typeof m.n === 'string' ? m.n.trim().slice(0, 24) : '';
+  if (!id || !n) return null;
+  const out = { v: 1, id, n, in: typeof m.in === 'string' && m.in.trim() ? m.in.trim().slice(0, 3) : iniziali(n), c: Number.isInteger(m.c) ? ((m.c % 6) + 6) % 6 : 0 };
+  if (periodoValido(m.p)) out.p = { t: m.p.t, k: m.p.k };
+  out.ts = num(m.ts, 0, 1e11) || 0;
+  const sf = m.sf;
+  out.sf = sf && typeof sf === 'object' && num(sf.g, 0, 999) != null ? { g: Math.round(sf.g), r: Math.round(num(sf.r, 0, 9999) || 0), rg: Math.round(num(sf.rg, 0, 9999) || 0), v: sf.v === 'f' ? 'f' : 'c' } : null;
+  out.se = Math.round(num(m.se, 0, 999) || 0); out.st = Math.round(num(m.st, 0, 9999) || 0);
+  if (Array.isArray(m.an)) out.an = m.an.map(x => num(x, 0, 99)).filter(x => x != null).slice(-8).map(x => Math.round(x * 10) / 10);
+  if ('mg' in m) out.mg = num(m.mg, 1, 3600) == null ? null : Math.round(m.mg);
+  if ('mi' in m) out.mi = num(m.mi, -100, 1000) == null ? null : Math.round(m.mi);
+  if (m.te && typeof m.te === 'object') { out.te = {}; for (const p of PROVE) out.te[p.id] = Math.round(num(m.te[p.id], 0, 9999) || 0); out.tf = Array.isArray(m.tf) ? PROVE.map(p => p.id).filter(id2 => m.tf.includes(id2)) : []; }
+  return out;
+}
 export const provaEq = (m, id) => m.te ? valoreEq(id, { v: m.te[id] || 0, fac: (m.tf || []).includes(id) }) : null;
 
 // ───────────────────────── Classifica

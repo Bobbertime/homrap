@@ -232,7 +232,7 @@ function vistaRiepilogo() {
     ${s.interrotta ? `<p class="pic sec">${t('riep.interrotta')}</p>` : s.fattore < 1 ? `<p class="pic sec">${t('riep.ridotta')}</p>` : ''}
     ${s.orologio ? `<div class="card fila tra">${s.orologio.bpmMedio ? `<div><span class="pic sec forte">${t('riep.bpm')}</span><div class="medio">${s.orologio.bpmMedio}</div></div>` : ''}${s.orologio.bpmMax ? `<div><span class="pic sec forte">${t('riep.bpmMax')}</span><div class="medio">${s.orologio.bpmMax}</div></div>` : ''}${s.orologio.calorie ? `<div><span class="pic sec forte">${t('riep.kcal')}</span><div class="medio">${s.orologio.calorie}</div></div>` : ''}</div>` : ''}
     ${sugg ? cartaSuggerimento(sugg) : ''}
-    <a class="btn largo" href="#/report/${s.id}">${ico('battito')}${t('rep.apri')}</a>
+    <a class="btn largo" href="#/report/${encodeURIComponent(s.id)}">${ico('battito')}${t('rep.apri')}</a>
     <button class="btn largo" data-a="condividi">${ico('condividi')}${t('riep.condividi')}</button>
     <div class="fondo-fisso"><button class="btn primario largo" data-a="defaticamento">${t('riep.defaticamento')}</button><button class="btn testo largo" data-a="chiudi">${t('riep.salta')}</button></div>`;
 }

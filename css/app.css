@@ -1,3 +1,8 @@
+/* Caratteri dentro l'app (cartella fonts/, licenza SIL Open Font License): nessuna richiesta a server esterni. */
+@font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 200 800; font-display: swap; src: url('../fonts/plus-jakarta-sans-latin-wght-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 600; font-display: swap; src: url('../fonts/barlow-condensed-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 700; font-display: swap; src: url('../fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 800; font-display: swap; src: url('../fonts/barlow-condensed-latin-800-normal.woff2') format('woff2'); }
 /* HoMRAP – stile: caldo e arrotondato, numeri grandi e stretti. Colori in variabili per tema scuro e chiaro. */
 :root {
   --bg: #121214; --sup: #1D1D21; --sup2: #2A2A30; --txt: #F5F5F4; --txt2: #A8A29E; --lin: #2E2E34;

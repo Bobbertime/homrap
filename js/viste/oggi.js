@@ -68,7 +68,7 @@ registra('oggi', () => {
   else if (inRipartenza(S.sessioni, d)) avvisi.push(avviso('ricarica', t('oggi.ripartenza'), t('oggi.ripartenzaTesto')));
   if (c.settimana >= 4) avvisi.push(avviso('bersaglio', t(c.settimana === 4 ? 'oggi.scarico' : 'oggi.testOra'), t(c.settimana === 4 ? 'oggi.scaricoTesto' : 'oggi.testOraTesto'), `<a class="btn ${c.settimana > 4 ? 'primario' : ''} piccolo" href="#/test/mensile">${t('oggi.faiTestMensile')}</a>`));
   const giorniBackup = S.backup.ultimo ? Math.floor((Date.now() - S.backup.ultimo) / 864e5) : null;
-  if (S.stato.backupRimandato !== d && (S.backup.daRicordare || (giorniBackup == null ? S.sessioni.length >= 3 : giorniBackup > 14)))
+  if (!S.stato.demo && S.stato.backupRimandato !== d && (S.backup.daRicordare || (giorniBackup == null ? S.sessioni.length >= 3 : giorniBackup > 14)))
     avvisi.push(avviso('scarica', t('oggi.backup'), giorniBackup == null ? t('oggi.backupMai') : tn('oggi.backupVecchio', giorniBackup), `<button class="btn primario piccolo" data-a="backup">${t('bak.salva')}</button><button class="btn piccolo" data-a="backupDopo">${t('comune.piuTardi')}</button>`));
 
   // Card principale
@@ -84,7 +84,7 @@ registra('oggi', () => {
     : `<div class="card grande col stretti"><span class="pill ar" style="align-self:flex-start">${t(fattaOggi ? 'oggi.fatto' : 'oggi.riposo')}</span>
       ${fattaOggi ? `<div class="fila base"><span class="grosso">${fmtPunti(fattaOggi.giri, fattaOggi.extra)}</span><span class="sec forte">${t('comune.giri')}</span></div>` : `<div class="titolone" style="font-size:32px;margin-top:4px">${t('oggi.riposoTitolo')}</div>`}
       <p class="sec" style="font-weight:600">${t('oggi.prossimo', { giorno: fmtData(pr.data, { weekday: 'long', day: 'numeric', month: 'long' }), tipo: c.tipo })}</p>
-      <div class="fila avvolgi stretti" style="margin-top:8px">${fattaOggi ? `<a class="btn primario" href="#/report/${fattaOggi.id}">${ico('battito')}${t('rep.apri')}</a>` : ''}<button class="btn" data-a="comunque">${t('oggi.comunque')}</button></div></div>`;
+      <div class="fila avvolgi stretti" style="margin-top:8px">${fattaOggi ? `<a class="btn primario" href="#/report/${encodeURIComponent(fattaOggi.id)}">${ico('battito')}${t('rep.apri')}</a>` : ''}<button class="btn" data-a="comunque">${t('oggi.comunque')}</button></div></div>`;
 
   // Sfida del mese
   const mese = meseISO(d), sfida = sfidaDelMese(mese), best = migliorSfida(S.sessioni, mese);

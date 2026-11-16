@@ -2,7 +2,7 @@
 import { S, salva, contesto, backupCorrente, oggi } from './stato.js';
 import { scegli, sostituisci } from './logica.js';
 import { PER_ID } from '../data/esercizi.js';
-import { condividiFile, ico } from './ui.js';
+import { condividiFile, ico, toast } from './ui.js';
 import { t, impostaLingua, lingua } from './i18n.js';
 
 function rimpiazza(id, con) {
@@ -28,6 +28,7 @@ export async function riammetti(id) {
   await salva('esercizi');
 }
 export async function salvaBackup() {
+  if (S.stato.demo) { toast(t('demo.bloccato')); return false; }   // nella demo il backup conterrebbe i dati di esempio
   const blob = new Blob([JSON.stringify(backupCorrente())], { type: 'application/json' });
   const esito = await condividiFile(blob, `homrap-backup-${oggi()}.json`);
   if (esito === 'annullato') return false;

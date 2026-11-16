@@ -3,6 +3,8 @@
 //
 // Scorrimento: ogni voce della cronologia riceve un numero (history.state.i). Tornando indietro la pagina
 // riparte da dove l'avevi lasciata; andando avanti (pagina nuova) parte dall'alto.
+import { chiudiFogli } from './ui.js';
+
 const viste = {};
 let corrente = null, nomeCorrente = '', guardia = null;
 const app = () => document.getElementById('app');
@@ -32,6 +34,7 @@ function alCambio() {
   const voce = history.state && typeof history.state.i === 'number' ? history.state.i : null;
   const r = passoNav(nav, { hash: location.hash, voce, sostituzione, y: window.scrollY });
   sostituzione = false; nav = r.stato;
+  chiudiFogli();
   if (r.nuova) { try { history.replaceState({ i: nav.idx }, ''); } catch { /* ignora */ } }
   ricordaNav();
   disegna(false, r.ripristina);
@@ -41,7 +44,7 @@ export function registra(nome, fn) { viste[nome] = fn; }
 export function impostaGuardia(fn) { guardia = fn; }
 export function rotta() {
   const [nome, ...par] = location.hash.replace(/^#\/?/, '').split('/');
-  return { nome: nome || 'oggi', par: par.map(decodeURIComponent) };
+  return { nome: nome || 'oggi', par: par.map(p => { try { return decodeURIComponent(p); } catch { return p; } }) };
 }
 // Il nome della schermata da cui si arriva (durante la creazione di una vista è ancora quella precedente).
 export const vistaAttuale = () => nomeCorrente;

@@ -1,5 +1,8 @@
 // Importazione dei file degli orologi: decoder FIT (binario) scritto a mano, TCX e GPX con DOMParser.
-// Risultato comune: { inizio (ms), durata (s), bpmMedio, bpmMax, calorie, curva: [[secondi, bpm]…], giri: [{ durata }] }
+// Risultato comune: { inizio (ms), durata (s), bpmMedio, bpmMax, calorie, curva: [[secondi, bpm]…],
+//   giri: [{ durata (s, pause comprese), timer (s senza pause), bpm, bpmMax, da (s dall'inizio) }],
+//   copertura (quota dei campioni che hanno il battito, da 0 a 1), pausa (s di pausa in tutto) }
+// Controllato con file veri di un Suunto Race S (settembre 2026): vedi il README.
 const EPOCA_FIT = 631065600; // secondi tra 1970-01-01 e 1989-12-31
 const MSG = { session: 18, lap: 19, record: 20 };
 
@@ -50,15 +53,22 @@ export function decodificaFIT(buffer) {
     if (nome) out[nome].push(m);
     return p + d.extra;
   }
-  const s = out.session[0] || {}, rec = out.record.filter(r => r[253] != null);
+  const s = out.session[0] || {}, rec = out.record.filter(r => r[253] != null), valido = v => v != null && v > 0;
   const t0 = s[2] != null ? s[2] : rec.length ? rec[0][253] : out.lap.length ? (out.lap[0][2] != null ? out.lap[0][2] : out.lap[0][253]) : null;
-  const battiti = rec.filter(r => r[3] != null);
+  const battiti = rec.filter(r => valido(r[3]));
+  const lap = l => { const g = { durata: Math.round((l[7] != null ? l[7] : l[8] || 0) / 100) / 10 };
+    if (l[8] != null) g.timer = Math.round(l[8] / 100) / 10;
+    if (valido(l[15])) g.bpm = l[15]; if (valido(l[16])) g.bpmMax = l[16];
+    if (l[2] != null && t0 != null) g.da = l[2] - t0;
+    return g; };
   const durata = s[7] != null ? s[7] / 1000 : s[8] != null ? s[8] / 1000 : rec.length > 1 ? rec[rec.length - 1][253] - rec[0][253] : out.lap.reduce((t, l) => t + (l[7] || 0) / 1000, 0);
   return rifinisci({
     inizio: t0 != null ? (t0 + EPOCA_FIT) * 1000 : null, durata,
-    bpmMedio: s[16] != null ? s[16] : null, bpmMax: s[17] != null ? s[17] : null, calorie: s[11] != null ? s[11] : null,
+    bpmMedio: valido(s[16]) ? s[16] : null, bpmMax: valido(s[17]) ? s[17] : null, calorie: s[11] != null ? s[11] : null,
     curva: battiti.map(r => [r[253] - (t0 != null ? t0 : battiti[0][253]), r[3]]),
-    giri: out.lap.map(l => ({ durata: Math.round((l[7] != null ? l[7] : l[8] || 0) / 100) / 10 })),
+    giri: out.lap.map(lap),
+    copertura: rec.length ? Math.round(battiti.length / rec.length * 100) / 100 : null,
+    pausa: s[7] != null && s[8] != null ? Math.max(0, Math.round((s[7] - s[8]) / 1000)) : 0,
   });
 }
 function rifinisci(d) {
@@ -75,6 +85,8 @@ export function decodificaTCX(testo) {
   const laps = [...doc.querySelectorAll('Lap')];
   if (!laps.length) throw new Error('tcx');
   const punti = [...doc.querySelectorAll('Trackpoint')].map(p => ({ t: Date.parse((p.querySelector('Time') || {}).textContent), b: num(p, 'HeartRateBpm Value') })).filter(p => !isNaN(p.t));
+  const lapTCX = l => { const g = { durata: Math.round((num(l, 'TotalTimeSeconds') || 0) * 10) / 10 }, b = num(l, 'AverageHeartRateBpm Value'), m = num(l, 'MaximumHeartRateBpm Value'), da = Date.parse(l.getAttribute('StartTime'));
+    if (b) g.bpm = Math.round(b); if (m) g.bpmMax = Math.round(m); if (!isNaN(da) && inizio) g.da = Math.round((da - inizio) / 1000); return g; };
   const inizio = Date.parse(laps[0].getAttribute('StartTime')) || (punti[0] && punti[0].t) || null;
   const massimi = laps.map(l => num(l, 'MaximumHeartRateBpm Value')).filter(Boolean), medi = laps.map(l => num(l, 'AverageHeartRateBpm Value')).filter(Boolean);
   return rifinisci({
@@ -82,7 +94,7 @@ export function decodificaTCX(testo) {
     bpmMedio: medi.length ? Math.round(medi.reduce((a, b) => a + b, 0) / medi.length) : null, bpmMax: massimi.length ? Math.max(...massimi) : null,
     calorie: laps.reduce((t, l) => t + (num(l, 'Calories') || 0), 0) || null,
     curva: punti.filter(p => p.b).map(p => [Math.round((p.t - inizio) / 1000), p.b]),
-    giri: laps.map(l => ({ durata: Math.round((num(l, 'TotalTimeSeconds') || 0) * 10) / 10 })),
+    giri: laps.map(lapTCX), copertura: punti.length ? Math.round(punti.filter(p => p.b).length / punti.length * 100) / 100 : null, pausa: 0,
   });
 }
 export function decodificaGPX(testo) {
@@ -94,7 +106,8 @@ export function decodificaGPX(testo) {
   if (!punti.length) throw new Error('gpx');
   const inizio = punti[0].t;
   return rifinisci({ inizio, durata: (punti[punti.length - 1].t - inizio) / 1000, bpmMedio: null, bpmMax: null, calorie: null,
-    curva: punti.filter(p => p.b).map(p => [Math.round((p.t - inizio) / 1000), p.b]), giri: [] });
+    curva: punti.filter(p => p.b).map(p => [Math.round((p.t - inizio) / 1000), p.b]), giri: [],
+    copertura: Math.round(punti.filter(p => p.b).length / punti.length * 100) / 100, pausa: 0 });
 }
 export async function leggiFileOrologio(file) {
   const nome = file.name.toLowerCase();
@@ -105,7 +118,7 @@ export async function leggiFileOrologio(file) {
 // Abbina il file alla sessione più vicina per data e ora (entro 3 ore).
 export function abbina(dati, sessioni) {
   if (!dati.inizio) return null;
-  const c = sessioni.filter(s => s.tipo !== 'test' && s.inizio).map(s => ({ s, d: Math.abs(s.inizio - dati.inizio) })).sort((a, b) => a.d - b.d)[0];
+  const c = sessioni.filter(s => s.tipo !== 'test' && s.tipo !== 'orologio' && s.inizio).map(s => ({ s, d: Math.abs(s.inizio - dati.inizio) })).sort((a, b) => a.d - b.d)[0];
   return c && c.d < 3 * 3600e3 ? c.s : null;
 }
 // I lap diventano i giri: l'ultimo lap, chiuso dallo stop, è il giro incompleto.

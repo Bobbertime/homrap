@@ -281,10 +281,11 @@ export function quotaBattito(s, ctx) {
 function relativa(da, a, q, ctx) {
   return da.rif && da.rif === a.rif ? rifinisci(a, q * a.k / da.k) : quantita(a, ctx).q;
 }
-function modifica(g, v, tipo, ctx) {
+// presi: gli esercizi già nel giorno più quelli scelti dalle altre modifiche dello stesso suggerimento (mai due volte lo stesso).
+function modifica(g, v, tipo, ctx, presi) {
   const { x, e, i } = v, passo = e.unita === 'sec' ? 5 : e.pari ? 2 : 1, base = { i, da: x.id, a: x.id, q0: x.q };
   if (x.kg != null) { base.kg0 = x.kg; base.kg1 = x.kg; }
-  const altro = id => { const d = id && PER_ID[id]; return d && valido(d, ctx) && !g.esercizi.some(y => y.id === d.id) ? d : null; };
+  const altro = id => { const d = id && PER_ID[id]; return d && valido(d, ctx) && !presi.has(d.id) ? d : null; };
   if (tipo === 'aumenta') {
     let q1 = rifinisci(e, x.q * 1.12); if (q1 <= x.q) q1 = x.q + passo;
     const soglia = e.soglia || e.max;
@@ -331,7 +332,8 @@ export function valutaProgressione(piano, idx, sessioni, ctx) {
   const voci = g.esercizi.map((x, i) => ({ x, i, e: PER_ID[x.id] })).filter(v => v.e && !v.e.fisso);
   const intensita = v => v.x.q / Math.max(1, capDi(v.e, ctx) * v.e.k);
   voci.sort((a, b) => tipo === 'aumenta' ? intensita(a) - intensita(b) : intensita(b) - intensita(a)); // aumenta sui più facili
-  const modifiche = voci.slice(0, 3).map(v => modifica(g, v, tipo, ctx)).filter(Boolean).sort((a, b) => a.i - b.i);
+  const presi = new Set(g.esercizi.map(x => x.id));
+  const modifiche = voci.slice(0, 3).map(v => { const m = modifica(g, v, tipo, ctx, presi); if (m) presi.add(m.a); return m; }).filter(Boolean).sort((a, b) => a.i - b.i);
   return modifiche.length ? { tipo, motivo, ...base, modifiche } : null;
 }
 export function applicaModifiche(piano, sugg) {
@@ -388,7 +390,8 @@ export function consigliAcquisto(ctx, piano) {
     }
     if (!haTrazione && perSchema.trazione) { bonus += a.id === 'sbarra' ? 1.5 : a.id === 'kettlebell' ? 0.75 : 1; /* la kettlebell aiuta la trazione con un solo esercizio */ motivo = 'trazione'; schema = 'trazione'; }
     const movimenti = nuovi.filter(e => !e.paio).length;   // la versione a due manubri e quella a un braccio contano una volta sola
-    out.push({ attrezzo: a, punti: guadagno * 2 + bonus + movimenti * 0.15, guadagno, motivo, schema, perSchema, nuovi });
+    out.push({ attrezzo: a, punti: guadagno * 2 + bonus + Math.min(movimenti, 6) * 0.15,   // oltre 6 esercizi la varietà in più conta poco
+      guadagno, motivo, schema, perSchema, nuovi });
   }
   return out.sort((x, y) => y.punti - x.punti || (x.attrezzo.id < y.attrezzo.id ? -1 : 1)).slice(0, 3);
 }
