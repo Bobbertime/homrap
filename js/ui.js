@@ -2,6 +2,7 @@
 import { t, locale } from './i18n.js';
 import { PER_ID } from '../data/esercizi.js';
 import { mmss } from './util.js';
+import { svgFigura, haFigura } from './figure.js';
 
 export const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -47,6 +48,22 @@ const ICONE = {
 export const ico = (nome, dim = 20, extra = '') => `<svg width="${dim}" height="${dim}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${ICONE[nome] || ''}</svg>`;
 export const icoPlay = (dim = 14) => `<svg width="${dim}" height="${dim}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>`;
 export const icoPausa = (dim = 18) => `<svg width="${dim}" height="${dim}" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.500" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.500" fill="currentColor"/></svg>`;
+
+// ── Figura animata di un esercizio (js/figure.js). Si ferma e riparte con un tocco; se il telefono chiede meno movimento, resta ferma.
+const menoMovimento = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+export function figuraAnimata(id, nome, classe = '') {
+  if (!haFigura(id)) return '';
+  if (menoMovimento()) return `<div class="figura ${classe}">${svgFigura(id, { fermo: true, etichetta: esc(t('figura.alt', { nome })) })}</div>`;
+  return `<button class="figura ${classe}" data-a="figura" aria-pressed="false" aria-label="${esc(t('figura.pausa', { nome }))}">${svgFigura(id)}<span class="f-stato" aria-hidden="true">${icoPausa(14)}</span></button>`;
+}
+export function alternaFigura(el) {
+  const svg = el.querySelector('svg');
+  if (!svg || !svg.pauseAnimations) return;
+  const ferma = el.getAttribute('aria-pressed') !== 'true';
+  if (ferma) svg.pauseAnimations(); else svg.unpauseAnimations();
+  el.setAttribute('aria-pressed', ferma ? 'true' : 'false');
+  el.querySelector('.f-stato').innerHTML = ferma ? icoPlay(12) : icoPausa(14);
+}
 
 // ── Formati
 export function fmtQ(id, q) {

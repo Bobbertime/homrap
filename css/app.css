@@ -153,6 +153,9 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .scala button[aria-pressed='true'] { background: var(--ar); color: var(--su-ar); }
 .contatore { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .contatore .gigante { font-size: 140px; flex: 0 0 auto; }
+.contatore input.gigante { width: 150px; min-width: 0; height: 128px; padding: 0; border: 0; border-bottom: 3px dashed var(--lin); border-radius: 0; background: none; text-align: center; -moz-appearance: textfield; appearance: textfield; }
+.contatore input.gigante:focus { outline: none; border-bottom-color: var(--ar); }
+.contatore input::-webkit-outer-spin-button, .contatore input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .contatore .meno { flex: 0 0 56px; width: 56px; height: 56px; border-radius: 999px; background: var(--sup); font-size: 32px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 .contatore .piu { flex: 0 0 104px; height: 96px; padding: 0; border-radius: 32px; background: var(--ar); color: var(--su-ar); font-family: var(--fn); font-weight: 800; font-size: 48px; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
 
@@ -231,3 +234,19 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 ul.punti { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 @media (max-height: 700px) { .tempo { font-size: 88px; } .piu-giro { min-height: 132px; } .giro-box .num { font-size: 84px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* Figure animate degli esercizi */
+.figura { position: relative; display: block; width: 100%; padding: 6px 8px 0; border-radius: 22px; background: var(--sup); color: var(--txt); --fig-sfondo: var(--sup); }
+.figura-svg { display: block; width: 100%; max-height: 210px; margin: 0 auto; }
+.figura.bassa .figura-svg { max-height: 168px; }
+@media (max-height: 700px) { .figura.bassa .figura-svg { max-height: 120px; } }
+.card > .figura { padding: 8px 0 0; }
+.figura[aria-pressed='true'] .f-stato { background: var(--ars); color: var(--art); }
+.figura-svg path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.figura-svg .f-o { stroke: currentColor; }
+.figura-svg .f-dietro { opacity: .38; }
+.figura-svg .f-alone { stroke: var(--fig-sfondo); }
+.figura-svg .f-testa { fill: currentColor; }
+.figura-svg .f-terra { stroke: var(--lin); stroke-width: 3; }
+.figura-svg .f-attrezzo { stroke: var(--ar); stroke-width: 5; }
+.figura-svg .f-ombra { opacity: .26; }
+.figura .f-stato { position: absolute; right: 10px; top: 10px; width: 30px; height: 30px; border-radius: 999px; background: var(--sup2); color: var(--txt2); display: flex; align-items: center; justify-content: center; }

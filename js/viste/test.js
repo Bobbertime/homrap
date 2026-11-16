@@ -2,7 +2,8 @@
 import { S, salva, salvaTest, oggi, ultimoTest } from '../stato.js';
 import { t, tn, locale } from '../i18n.js';
 import { registra, vai, disegna } from '../router.js';
-import { esc, ico, conferma, interruttore } from '../ui.js';
+import { esc, ico, conferma, interruttore, figuraAnimata, alternaFigura } from '../ui.js';
+import { FIGURA_FACILITATA } from '../figure.js';
 import { PROVE, PROVA_TRAZIONI, RECUPERO_SEC, TENUTA_MAX_SEC } from '../../data/soglie-test.js';
 import { valutaTest, valoreEq, miglioramento, AREE } from '../logica.js';
 import { uid, mmss } from '../util.js';
@@ -13,8 +14,10 @@ let T = null, tic = null;
 const ora = () => Date.now();
 const provaCorrente = () => (T.i < PROVE.length ? PROVE[T.i] : PROVA_TRAZIONI);
 const ferma = () => { clearInterval(tic); tic = null; };
+const figuraProva = p => figuraAnimata(p.facilitata && T.fac[p.id] ? FIGURA_FACILITATA[p.id] : p.id, t('prove.' + p.id + (p.facilitata && T.fac[p.id] ? '.facilitata' : '.nome')), 'bassa');
 const dopoBurpees = () => T.i > 0 && PROVE[T.i - 1] && PROVE[T.i - 1].id === 'burpees';   // il recupero in cui si può misurare il battito
 
+function mostraConta() { const el = document.getElementById('t-conta'); if (el) { if ('value' in el) el.value = T.conta; else el.textContent = T.conta; } }
 function nuovo(tipo) {
   const prec = ultimoTest();
   T = { tipo, i: 0, fase: 'intro', ris: {}, conta: 0, t0: 0, tenuta: 0, detto: {}, conTrazioni: !!S.attrezzi.sbarra, battito: { fine: '', dopo: '' },
@@ -97,7 +100,7 @@ registra('test', ([tipo = 'mensile']) => {
       <div class="spazio"></div><div class="centro"><p class="sec forte">${t('test.recuperoTesto')}</p><div class="tempo" id="t-tempo">${mmss(RECUPERO_SEC)}</div></div>
       ${dopoBurpees() ? `<div class="card col stretti"><h3>${t('test.recBattito')}</h3><p class="pic sec">${t('test.recBattitoTesto')}</p>
         <div class="griglia2"><label class="campo">${t('test.recAdesso')}<input data-i="bpmFine" type="number" inputmode="numeric" value="${esc(T.battito.fine)}"></label><label class="campo">${t('test.recDopo')}<input data-i="bpmDopo" type="number" inputmode="numeric" value="${esc(T.battito.dopo)}"></label></div></div>` : ''}
-      <div class="card"><span class="pic forte art">${t('test.prossima')}</span><h2 style="margin:2px 0 0">${t('prove.' + p.id + '.nome')}</h2><p class="sec pic">${t('prove.' + p.id + '.regole')}</p></div>
+      <div class="card"><span class="pic forte art">${t('test.prossima')}</span><h2 style="margin:2px 0 0">${t('prove.' + p.id + '.nome')}${p.facilitata && T.fac[p.id] ? ` <span class="pill ar" style="vertical-align:middle">${t('test.facilitata')}</span>` : ''}</h2><p class="sec pic">${t('prove.' + p.id + (p.facilitata && T.fac[p.id] ? '.regoleFac' : '.regole'))}</p>${figuraProva(p)}</div>
       <div class="spazio"></div><button class="btn largo" data-a="saltaRecupero">${t('test.saltaRecupero')}</button>`;
   } else {
     const inCorso = T.fase === 'via' || T.fase === 'conto', tenuta = p.tipo === 'tenuta', libera = p.tipo === 'max';
@@ -106,18 +109,22 @@ registra('test', ([tipo = 'mensile']) => {
     if (T.fase === 'conto') { centro = `<div class="gigante centro art" id="t-tempo">3</div>`; sotto = ''; }
     else if (tenuta) {
       centro = `<div class="tempo centro" id="t-tempo">${mmss(T.fase === 'fatto' ? T.tenuta : 0)}</div>`;
-      sotto = T.fase === 'pronto' ? `<button class="btn primario largo" data-a="via">${t('test.avvio')}</button>`
+      sotto = T.fase === 'pronto' ? `<div class="fondo-fisso"><button class="btn primario largo" data-a="via">${t('test.avvio')}</button></div>`
         : T.fase === 'via' ? `<button class="piu-giro" data-a="stop" style="min-height:120px"><span class="num">${t('test.stop')}</span><span>${t('test.stopDesc')}</span></button>`
         : `<button class="btn primario largo" data-a="conferma">${t('comune.conferma')}</button><button class="btn largo" data-a="ripeti">${t('test.ripeti')}</button>`;
     } else {
-      const contatore = `<div class="contatore"><button class="meno" data-a="meno" aria-label="${t('test.meno')}">−</button><span class="gigante" id="t-conta" style="min-width:150px;text-align:center">${T.conta}</span><button class="piu" data-a="piu" aria-label="${t('test.piu')}">+1</button></div>`;
+      // A tempo scaduto (e nelle trazioni, che non hanno tempo) il numero si può anche scrivere: chi conta a mente non deve toccare +1 trenta volte.
+      const scrivibile = T.fase === 'fatto' || libera;
+      const numero = scrivibile ? `<input class="gigante" id="t-conta" data-i="conta" type="number" inputmode="numeric" min="0" max="999" value="${T.conta}" aria-label="${t('test.ripetizioni')}">` : `<span class="gigante" id="t-conta" style="min-width:150px;text-align:center">${T.conta}</span>`;
+      const contatore = `<div class="contatore"><button class="meno" data-a="meno" aria-label="${t('test.meno')}">−</button>${numero}<button class="piu" data-a="piu" aria-label="${t('test.piu')}">+1</button></div>${scrivibile ? `<p class="pic sec centro">${t('test.scrivi')}</p>` : ''}`;
       centro = (libera ? '' : `<div class="num centro ${T.fase === 'fatto' ? 'sec' : ''}" id="t-tempo" style="font-size:56px;line-height:1">${T.fase === 'fatto' ? t('test.tempoScaduto') : mmss(p.durata)}</div>`) + (T.fase === 'pronto' && !libera ? '' : contatore);
-      sotto = T.fase === 'pronto' && !libera ? `<button class="btn primario largo" data-a="via">${t('test.via')}</button>`
+      sotto = T.fase === 'pronto' && !libera ? `<div class="fondo-fisso"><button class="btn primario largo" data-a="via">${t('test.via')}</button></div>`   // sempre in vista, anche se con la figura la pagina scorre
         : T.fase === 'via' ? '' : `<button class="btn primario largo" data-a="conferma">${t('comune.conferma')}</button>${p.id === 'trazioni' ? `<button class="btn largo" data-a="saltaTrazioni">${t('test.saltaProva')}</button>` : `<button class="btn largo" data-a="ripeti">${t('test.ripeti')}</button>`}`;
     }
     html = `${testa(titolo)}
       <div><h1>${t('prove.' + p.id + '.nome')}${p.facilitata && T.fac[p.id] ? ` <span class="pill ar" style="vertical-align:middle">${t('test.facilitata')}</span>` : ''}</h1>
         <p class="sec" style="margin-top:6px">${t('prove.' + p.id + (p.facilitata && T.fac[p.id] ? '.regoleFac' : '.regole'))}</p></div>
+      ${T.fase === 'pronto' ? figuraProva(p) : ''}
       ${inCorso ? '' : `<div class="card"><ul class="punti pic">${t('prove.' + p.id + '.consigli').map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
         ${p.facilitata && T.fase === 'pronto' ? `<div class="card fila tra"><div class="col stretti"><span class="forte">${t('test.varianteFacilitata')}</span><span class="pic sec">${t('prove.' + p.id + '.facilitata')}</span></div>${interruttore('fac', T.fac[p.id], t('test.varianteFacilitata'))}</div>` : ''}`}
       <div class="spazio"></div>${centro}<div class="spazio"></div>${sotto}`;
@@ -130,8 +137,10 @@ registra('test', ([tipo = 'mensile']) => {
       dopo: () => { T = null; vai('oggi'); },   // si può guardare l'app prima del test: per allenarsi resta obbligatorio
       fac: () => { const id = provaCorrente().id; T.fac[id] = !T.fac[id]; disegna(); },
       via: () => { sbloccaAudio(); T.conta = 0; passa('conto'); },
-      piu: () => { T.conta++; vibra(20); const el = document.getElementById('t-conta'); if (el) el.textContent = T.conta; },
-      meno: () => { T.conta = Math.max(0, T.conta - 1); const el = document.getElementById('t-conta'); if (el) el.textContent = T.conta; },
+      piu: () => { T.conta = Math.min(999, T.conta + 1); vibra(20); mostraConta(); },
+      meno: () => { T.conta = Math.max(0, T.conta - 1); mostraConta(); },
+      conta: el => { T.conta = Math.max(0, Math.min(999, parseInt(el.value, 10) || 0)); },
+      figura: alternaFigura,
       stop: fermaTenuta,
       ripeti: () => { T.conta = 0; T.tenuta = 0; passa('pronto'); },
       conferma: confermaProva,

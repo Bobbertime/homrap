@@ -69,7 +69,7 @@ export const IT = {
     5: { nome: "Esperto", desc: "Livello molto alto: il piano usa le varianti più difficili." },
   },
   test: {
-    iniziale: "Test iniziale", mensile: "Test mensile", introTitolo: "Misuriamo il tuo livello",
+    iniziale: "Test iniziale", mensile: "Test mensile", scrivi: "Puoi anche toccare il numero e scriverlo.", ripetizioni: "Ripetizioni fatte", introTitolo: "Misuriamo il tuo livello",
     introTesto: "Cinque prove senza attrezzi, con 90 secondi di recupero tra una e l'altra. Servono circa 12 minuti. Dai il massimo, ma con una buona esecuzione.",
     introAvviso: "Fai qualche minuto di riscaldamento prima di partire. Se senti dolore, capogiri o fiato corto anomalo, fermati.",
     inizia: "Inizia il test", dopo: "Lo faccio dopo: prima guardo l'app", provaDi: "Prova {i} di {n}", provaFacoltativa: "Prova facoltativa", facilitata: "facilitata", varianteFacilitata: "Variante facilitata",
@@ -276,6 +276,7 @@ export const IT = {
   demo: { oggiTitolo: "Stai guardando dati di esempio", oggi: "Quello che fai qui non viene salvato. Esci dalla demo per tornare ai tuoi dati.", oggiSenzaTest: "Quello che fai qui non viene salvato. Per usare l'app davvero fai il test iniziale: servono circa 12 minuti.", esci: "Esci dalla demo", esciTest: "Esci dalla demo e fai il test",
     bloccato: "Nella demo non si può: prima spegnila dal Profilo.", titolo: "Modalità demo", desc: "Carica dati di esempio per provare grafici e classifica", attiva: "Modalità demo attiva: stai vedendo dati di esempio. Spegnila dal Profilo per tornare ai tuoi.", accesa: "Demo attiva: dati di esempio caricati", spenta: "Demo spenta: sono tornati i tuoi dati" },
   lib: { testo: "Tutti gli esercizi, dal più facile al più difficile. Il numero è il livello. Quelli in grigio richiedono attrezzi che non hai o sono esclusi.", escluso: "escluso da te" },
+  figura: { alt: "Figura: {nome}", pausa: "Ferma o fai ripartire l'animazione: {nome}" },
   esercizio: { muscoli: "Muscoli coinvolti", consigli: "Come si fa", errori: "Errori comuni", respiro: "Respirazione", corpoLibero: "Corpo libero", salti: "Con salti", paio: "Servono due manubri", piuFacile: "PIÙ FACILE", piuDifficile: "PIÙ DIFFICILE",
     video: "Guarda un video su YouTube", videoRicerca: "esecuzione corretta", videoNotaRicerca: "Si apre YouTube fuori dall'app, con una ricerca per questo esercizio.", videoNota: "Si apre YouTube fuori dall'app.",
     escludi: "Non proporlo più", escludiDesc: "L'app lo sostituisce con un'alternativa dello stesso schema", escluso: "Esercizio escluso", riammesso: "Esercizio di nuovo disponibile" },

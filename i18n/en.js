@@ -69,7 +69,7 @@ export const EN = {
     5: { nome: "Expert", desc: "Very high level: the plan uses the hardest variations." },
   },
   test: {
-    iniziale: "First test", mensile: "Monthly test", introTitolo: "Let's measure your level",
+    iniziale: "First test", mensile: "Monthly test", scrivi: "You can also tap the number and type it.", ripetizioni: "Reps done", introTitolo: "Let's measure your level",
     introTesto: "Five tests without equipment, with 90 seconds of rest between them. It takes about 12 minutes. Give it your best, but with good form.",
     introAvviso: "Warm up for a few minutes before you start. If you feel pain, dizziness or unusual shortness of breath, stop.",
     inizia: "Start the test", dopo: "I'll do it later: let me look at the app first", provaDi: "Test {i} of {n}", provaFacoltativa: "Optional test", facilitata: "easier", varianteFacilitata: "Easier variation",
@@ -276,6 +276,7 @@ export const EN = {
   demo: { oggiTitolo: "You are looking at sample data", oggi: "What you do here is not saved. Leave the demo to go back to your data.", oggiSenzaTest: "What you do here is not saved. To use the app for real take the first test: it takes about 12 minutes.", esci: "Leave the demo", esciTest: "Leave the demo and take the test",
     bloccato: "Not available in the demo: turn it off in Profile first.", titolo: "Demo mode", desc: "Loads sample data to try charts and leaderboard", attiva: "Demo mode active: you are seeing sample data. Turn it off in Profile to go back to yours.", accesa: "Demo on: sample data loaded", spenta: "Demo off: your data is back" },
   lib: { testo: "All the exercises, from easiest to hardest. The number is the level. Greyed-out ones need equipment you don't have, or are excluded.", escluso: "excluded by you" },
+  figura: { alt: "Figure: {nome}", pausa: "Pause or resume the animation: {nome}" },
   esercizio: { muscoli: "Muscles involved", consigli: "How to do it", errori: "Common mistakes", respiro: "Breathing", corpoLibero: "Bodyweight", salti: "With jumps", paio: "Needs two dumbbells", piuFacile: "EASIER", piuDifficile: "HARDER",
     video: "Watch a video on YouTube", videoRicerca: "proper form", videoNotaRicerca: "YouTube opens outside the app, with a search for this exercise.", videoNota: "YouTube opens outside the app.",
     escludi: "Don't suggest it again", escludiDesc: "The app replaces it with an alternative of the same pattern", escluso: "Exercise excluded", riammesso: "Exercise available again" },

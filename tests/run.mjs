@@ -15,6 +15,7 @@ import { t, tn, impostaLingua, lingua, locale } from '../js/i18n.js';
 import { piuGiorni, settimanaISO, lunedi, linkVideo, eYouTube } from '../js/util.js';
 import * as A from '../js/analisi.js';
 import { passoNav } from '../js/router.js';
+import * as F from '../js/figure.js';
 
 const radice = join(dirname(fileURLToPath(import.meta.url)), '..');
 let ok = 0, ko = 0;
@@ -500,6 +501,70 @@ prova('nessuna chiamata di rete: né pagina, né stile, né service worker, né 
   for (const f of file) { const righe = readFileSync(join(radice, f), 'utf8').split('\n').filter(r => /https?:\/\//.test(r) && !/^\s*(\/\/|\*|\/\*)/.test(r));
     for (const r of righe) vero(/youtube\.com\/results|www\.w3\.org/.test(r) && !/fetch\(|src=|href="https/.test(r), `${f}: ${r.trim().slice(0, 90)}`); }
   vero(!/googleapis|gstatic/.test(readFileSync(join(radice, 'index.html'), 'utf8') + readFileSync(join(radice, 'sw.js'), 'utf8'))); });
+gruppo('Figure animate');
+const OSSA_FIG = [['piede', 'caviglia', 'punta'], ['tibia', 'caviglia', 'ginocchio'], ['coscia', 'ginocchio', 'anca'], ['busto', 'anca', 'spalla'], ['collo', 'spalla', 'testa'], ['braccio', 'spalla', 'gomito'], ['avambraccio', 'gomito', 'mano'], ['coscia', 'ginocchio2', 'anca'], ['tibia', 'caviglia2', 'ginocchio2'], ['piede', 'caviglia2', 'punta2']];
+const distF = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const fermoF = (quadri, nome) => Math.max(...quadri.map(J => distF(J[nome], quadri[0][nome])));   // di quanto si sposta un punto nel ciclo
+prova('ogni prova del test ha la sua figura, anche nella variante facilitata', () => {
+  for (const p of PROVE) vero(F.haFigura(p.id), p.id);
+  vero(F.haFigura('trazioni'), 'trazioni');
+  for (const p of PROVE.filter(x => x.facilitata)) vero(F.haFigura(F.FIGURA_FACILITATA[p.id]), 'facilitata ' + p.id);
+  for (const id of F.ELENCO_FIGURE) vero(PER_ID[id] || PROVE.some(p => p.id === id), id + ' non è né una prova né un esercizio');
+  uguale(F.svgFigura('non_esiste'), ''); uguale(F.fotogrammi('non_esiste'), null);
+});
+prova('in ogni fotogramma le ossa hanno la loro lunghezza, niente entra nel pavimento e il ciclo si chiude', () => {
+  for (const id of F.ELENCO_FIGURE) {
+    const { durata, quadri } = F.fotogrammi(id);
+    vero(durata >= 2 && durata <= 6 && quadri.length === Math.round(durata * F.FPS) + 1, id + ': durata o numero di fotogrammi');
+    quadri.forEach((J, i) => {
+      for (const [osso, a, b] of OSSA_FIG) vero(Math.abs(distF(J[a], J[b]) - F.OSSA[osso]) < 0.05, `${id} fotogramma ${i}: ${osso} lungo ${distF(J[a], J[b]).toFixed(2)}`);
+      for (const [nome, p] of Object.entries(J)) vero(Number.isFinite(p[0]) && Number.isFinite(p[1]) && p[1] > -0.6, `${id} fotogramma ${i}: ${nome} a y ${p[1]}`);
+    });
+    for (const nome of Object.keys(quadri[0])) vero(distF(quadri[0][nome], quadri[quadri.length - 1][nome]) < 1e-6, id + ': il ciclo non si chiude su ' + nome);
+  }
+});
+prova('le figure rispettano le regole delle prove', () => {
+  const posa = (id, nome) => F.giunti(F.figura(id).pose[nome]), q = id => F.fotogrammi(id).quadri;
+  // squat: cosce parallele al pavimento, piedi fermi
+  const sq = posa('squat', 'giu'); vero(Math.abs(sq.anca[1] - sq.ginocchio[1]) < 2, 'squat: cosce non parallele');
+  vero(fermoF(q('squat'), 'caviglia') < 0.01 && fermoF(q('squat'), 'punta') < 0.01, 'squat: i piedi si muovono');
+  // piegamenti: mani e punte ferme, petto a un pugno da terra, corpo in linea
+  for (const [id, perno] of [['piegamenti', 'punta'], ['piegamenti_ginocchia', 'ginocchio']]) {
+    vero(fermoF(q(id), 'mano') < 0.05 && fermoF(q(id), perno) < 0.01, id + ': mani o appoggio si muovono');
+    const su = posa(id, 'alto'), giu = posa(id, 'basso');
+    vero(su.spalla[1] > 30 && giu.spalla[1] > 5 && giu.spalla[1] < 12, id + ': altezza delle spalle');
+    for (const J of q(id)) { const a = J[perno === 'punta' ? 'caviglia' : 'ginocchio'], d = distF(a, J.spalla), somma = perno === 'punta' ? 86 : 60; vero(Math.abs(d - somma) < 0.05, id + ': il corpo non resta in linea'); }
+  }
+  // plank: gomiti e avambracci fermi, corpo in linea nella tenuta
+  vero(fermoF(q('plank'), 'gomito') < 0.01 && fermoF(q('plank'), 'mano') < 0.01 && fermoF(q('plank'), 'spalla') < 0.01, 'plank: le braccia si muovono');
+  const pl = posa('plank', 'linea'); vero(Math.abs(distF(pl.caviglia, pl.spalla) - 86) < 0.05 && Math.abs(pl.spalla[0] - pl.gomito[0]) < 0.01, 'plank: linea o gomiti');
+  // superman: petto, braccia e cosce staccati, bacino a terra
+  const sm = posa('superman', 'su'); vero(sm.anca[1] < 2 && sm.spalla[1] > 5 && sm.mano[1] > sm.spalla[1] && sm.ginocchio[1] > 3 && sm.caviglia[1] > sm.ginocchio[1], 'superman');
+  // burpees: petto a terra, poi salto con le mani sopra la testa
+  const bu = q('burpees');
+  vero(Math.min(...bu.map(J => J.spalla[1])) < 5, 'burpees: il petto non arriva a terra');
+  const volo = bu.filter(J => J.caviglia[1] > 10 && J.spalla[1] > 90); vero(volo.length >= 1 && volo.some(J => J.mano[1] > J.testa[1] + F.TESTA), 'burpees: manca il salto con le mani sopra la testa');
+  // variante facilitata: un piede alla volta, niente salto e niente piegamento
+  const bf = q('burpees_senza_salto');
+  vero(bf.every(J => Math.min(J.punta[1], J.punta2[1]) < 1.5), 'burpees facilitati: i due piedi si staccano insieme');
+  vero(bf.some(J => distF(J.caviglia, J.caviglia2) > 30), 'burpees facilitati: le gambe non si muovono una alla volta');
+  vero(Math.min(...bf.map(J => J.spalla[1])) > 25 && Math.max(...bf.map(J => J.testa[1])) < 105, 'burpees facilitati: piegamento o salto');
+  // trazioni: mani ferme sulla sbarra, mento sopra la sbarra
+  vero(fermoF(q('trazioni'), 'mano') < 0.01, 'trazioni: le mani si muovono');
+  const tr = posa('trazioni', 'su'), ap = posa('trazioni', 'appeso'); vero(tr.testa[1] - F.TESTA > tr.mano[1] && ap.testa[1] + F.TESTA < ap.mano[1], 'trazioni: mento e sbarra');
+});
+prova('il disegno: animato o fermo, con il testo per lo screen reader e senza niente di esterno', () => {
+  for (const id of F.ELENCO_FIGURE) {
+    const vivo = F.svgFigura(id), fermo = F.svgFigura(id, { fermo: true, etichetta: 'Figura: prova' });
+    vero(vivo.startsWith('<svg') && vivo.endsWith('</svg>') && vivo.includes('repeatCount="indefinite"') && vivo.includes('aria-hidden="true"'), id + ': svg animato');
+    vero(!fermo.includes('<animate') && fermo.includes('role="img" aria-label="Figura: prova"') && fermo.includes('f-ombra'), id + ': svg fermo');
+    for (const s of [vivo, fermo]) vero(!/NaN|undefined|Infinity|http|href|<script|<image/.test(s), id + ': contenuto inatteso');
+    vero(vivo.length < 16000, id + ': disegno troppo pesante (' + vivo.length + ')');
+    const alto = +vivo.match(/viewBox="0 0 (\d+) (\d+)"/)[2]; vero(alto >= 40 && alto <= 180, id + ': altezza ' + alto);
+  }
+  vero(F.svgFigura('burpees_senza_salto').includes('f-dietro') && !F.svgFigura('squat').includes('f-dietro'), 'la seconda gamba si disegna solo dove serve');
+});
+
 prova('settimana ISO e lunedì', () => { uguale(settimanaISO('2026-11-16'), '2026-W47'); uguale(settimanaISO('2027-01-01'), '2026-W53'); uguale(lunedi('2026-11-22'), '2026-11-16'); });
 
 await new Promise(r => setTimeout(r, 50));

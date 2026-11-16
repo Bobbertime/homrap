@@ -2,7 +2,7 @@
 import { S, salva, salvaSessione, contesto, importa, cancellaTutto, valutazione, oggi } from '../stato.js';
 import { t, tn, nomeEsercizio, lingua, LINGUE } from '../i18n.js';
 import { registra, vai, disegna, indietro } from '../router.js';
-import { esc, ico, foglio, toast, conferma, avatar, sagoma, interruttore, intestazione, fmtData, fmtPunti, copiaTesto } from '../ui.js';
+import { esc, ico, foglio, toast, conferma, avatar, sagoma, interruttore, figuraAnimata, alternaFigura, intestazione, fmtData, fmtPunti, copiaTesto } from '../ui.js';
 import { consigliAcquisto, haAttrezzi, OBIETTIVI } from '../logica.js';
 import { iniziali } from '../classifica.js';
 import { ESERCIZI, PER_ID, SCHEMI } from '../../data/esercizi.js';
@@ -12,7 +12,7 @@ import { leggiFileOrologio, abbina, giriDaLap } from '../orologi.js';
 import { attivaDemo, disattivaDemo } from '../demo.js';
 import { mmss, linkVideo, uid, isoData } from '../util.js';
 
-export const VERSIONE = '1.0.5';
+export const VERSIONE = '1.0.6';
 
 export async function ripristinaDaFile(file, dopo) {
   if (!file) return;
@@ -98,7 +98,7 @@ registra('esercizio', ([id]) => {
     html: `<main class="pagina piena">
       <div class="fila"><button class="ico-btn" data-a="indietro" aria-label="${t('comune.indietro')}">${ico('indietro')}</button><h1 style="font-size:24px">${esc(T('nome'))}</h1></div>
       <div class="fila avvolgi stretti"><span class="pill ar">${t('schemi.' + e.schema)}</span><span class="pill">${t('risultato.liv', { n: e.liv })}</span>${e.att.length ? e.att.map(g => `<span class="pill">${g.map(a => t('attrezzi.' + a)).join(' / ')}</span>`).join('') : `<span class="pill">${t('esercizio.corpoLibero')}</span>`}${e.paio ? `<span class="pill">${t('esercizio.paio')}</span>` : ''}${e.impatto ? `<span class="pill">${t('esercizio.salti')}</span>` : ''}</div>
-      ${e.anim ? `<img src="${esc(e.anim)}" alt="" style="width:100%;border-radius:22px">` : ''}
+      ${figuraAnimata(id, T('nome')) || (e.anim ? `<img src="${esc(e.anim)}" alt="" style="width:100%;border-radius:22px">` : '')}
       ${e.avviso ? `<div class="card tenue avviso"><span class="tondo">${ico('attenzione')}</span><p class="pic forte">${esc(T('avviso'))}</p></div>` : ''}
       <div class="card col"><div class="fila tra"><h3>${t('esercizio.muscoli')}</h3><span class="pic sec">${e.musc.map(m => t('muscoli.' + m)).join(', ')}</span></div>${sagoma(e.musc, e.musc2 || [])}</div>
       <div class="card col stretti"><h3>${t('esercizio.consigli')}</h3><ul class="punti">${T('consigli').map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
@@ -110,6 +110,7 @@ registra('esercizio', ([id]) => {
       <div class="riga alta"><span class="cresce"><span class="forte" style="display:block">${t('esercizio.escludi')}</span><span class="pic sec">${t('esercizio.escludiDesc')}</span></span>${interruttore('escludi', no, t('esercizio.escludi'))}</div></main>`,
     azioni: {
       indietro: () => indietro('libreria'),
+      figura: alternaFigura,
       escludi: async () => { if (no) await riammetti(id); else await risolviFastidio(id, 'escludi'); toast(t(no ? 'esercizio.riammesso' : 'esercizio.escluso')); disegna(); },
     },
   };

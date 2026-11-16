@@ -6,7 +6,7 @@
 // Variabili utili: CHROME=/percorso/di/chrome per usare un Chrome già installato; MODULI=/cartella/node_modules se Playwright è altrove.
 // Lo script avvia da solo un piccolo server sulla cartella del progetto, carica i dati di esempio (demo) e controlla che ogni
 // schermata si apra senza errori e senza scorrimento orizzontale, più i percorsi principali: report, ritorno indietro,
-// lingua, import di un file dell'orologio, correzione ed eliminazione di una sessione.
+// figure animate, ripetizioni scritte a mano nel test, lingua, import di un file dell'orologio, correzione ed eliminazione di una sessione.
 import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -78,6 +78,24 @@ for (const tema of ['dark', 'light']) {
   esito('indietro torna a Progressi dov\'era', (await hash()) === '#/progressi' && Math.abs((await Y()) - y0) <= 40, `y ${await Y()}, atteso ${y0}`);
   await vai('report/' + idUltima);
   esito('il report con l\'orologio ha curva, giri, zone e lettura', (await page.locator('svg.grafico').count()) >= 2 && (await page.locator('.zone > div').count()) === 5 && (await page.locator('.punti li').count()) >= 2);
+
+  // Figure animate: scheda dell'esercizio e test
+  await vai('esercizio/squat');
+  esito('la scheda dello squat ha la figura animata', (await page.locator('.figura svg animate').count()) >= 5 && (await page.locator('.figura').evaluate(el => el.getBoundingClientRect().height)) > 80);
+  await page.click('[data-a="figura"]'); await pausa(100);
+  esito('un tocco ferma la figura, un altro la fa ripartire', (await page.evaluate(() => document.querySelector('.figura svg').animationsPaused())) && (await page.getAttribute('.figura', 'aria-pressed')) === 'true'
+    && (await page.click('[data-a="figura"]'), !(await page.evaluate(() => document.querySelector('.figura svg').animationsPaused()))));
+  await vai('esercizio/affondi_alternati');
+  esito('un esercizio senza figura si apre lo stesso', (await page.locator('.figura').count()) === 0 && (await page.locator('.sagoma').count()) === 1);
+  await vai('test/mensile'); await page.click('[data-a="inizia"]'); await pausa(250);
+  esito('nel test la prova mostra la figura', (await page.locator('.figura svg animate').count()) >= 5 && (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0);
+  await page.click('[data-a="via"]'); await pausa(3400); await page.click('[data-a="piu"]');
+  await page.evaluate(() => { const vero = Date.now; Date.now = () => vero() + 61000; }); await pausa(500);   // salta alla fine del minuto
+  await page.fill('#t-conta', '30'); await page.click('[data-a="piu"]');
+  esito('a tempo scaduto le ripetizioni si possono scrivere', (await page.inputValue('#t-conta')) === '31');
+  await page.click('[data-a="conferma"]'); await pausa(300);
+  esito('nel recupero si vede la figura della prova successiva', (await page.locator('.card .figura svg animate').count()) >= 5);
+  await page.evaluate(() => location.reload()); await pausa(500);   // rimette a posto l'orologio e abbandona il test
 
   // Lingua
   await vai('profilo'); await page.click('[data-a="lingua"][data-v="en"]'); await pausa(250);

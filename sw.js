@@ -1,10 +1,10 @@
 // Service worker: mette in cache l'app al primo avvio, così dopo funziona offline.
 // IMPORTANTE: a ogni modifica dei file cambia VERSIONE, altrimenti i telefoni continuano a usare la copia vecchia.
-const VERSIONE = 'homrap-1.0.5';
+const VERSIONE = 'homrap-1.0.6';
 const FILE = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/router.js', './js/ui.js', './js/util.js', './js/db.js', './js/stato.js', './js/i18n.js', './js/audio.js',
-  './js/logica.js', './js/analisi.js', './js/classifica.js', './js/orologi.js', './js/backup.js', './js/azioni.js', './js/piattaforma.js', './js/immagini.js', './js/demo.js',
+  './js/logica.js', './js/analisi.js', './js/classifica.js', './js/orologi.js', './js/backup.js', './js/azioni.js', './js/piattaforma.js', './js/immagini.js', './js/demo.js', './js/figure.js',
   './js/viste/onboarding.js', './js/viste/test.js', './js/viste/piano.js', './js/viste/oggi.js', './js/viste/allenamento.js',
   './js/viste/progressi.js', './js/viste/report.js', './js/viste/classifica.js', './js/viste/profilo.js',
   './data/esercizi.js', './data/attrezzi.js', './data/soglie-test.js', './i18n/it.js', './i18n/en.js',
