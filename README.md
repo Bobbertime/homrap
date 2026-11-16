@@ -30,7 +30,7 @@ Il file vuoto `.nojekyll` dice a GitHub di pubblicare i file così come sono: la
 Dopo ogni modifica ai file, apri `sw.js` e cambia la riga
 
 ```js
-const VERSIONE = 'homrap-1.0.7';
+const VERSIONE = 'homrap-1.0.8';
 ```
 
 per esempio in `homrap-1.0.6` (e, se vuoi che si veda in fondo al Profilo, anche `VERSIONE` in `js/viste/profilo.js`). Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
@@ -98,7 +98,7 @@ GUIDA-SVILUPPO.md       come modificare l'app senza rompere niente: mappa del co
 node tests/run.mjs
 ```
 
-Serve Node 18 o successivo. Sono 113 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione (anche con il battito), analisi della sessione per il Report (battito massimo, zone, giri, confronto, frasi), posizione salvata tornando indietro, link dei video, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato, niente battito né età), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni, inglese con le stesse chiavi dell'italiano, manubrio singolo e kettlebell, andamento, carico della settimana e battito di recupero, import in stile Suunto, battiti per giro e progressione a parità di circuito, pulizia dei codici ricevuti, repertorio degli esercizi, assenza di chiamate di rete, figure animate (ossa di lunghezza costante, niente sotto il pavimento, regole delle prove rispettate).
+Serve Node 18 o successivo. Sono 114 test: ripetizioni e obiettivo di giri, scelta degli esercizi con i vincoli di attrezzi e infortuni, progressione (anche con il battito), analisi della sessione per il Report (battito massimo, zone, giri, confronto, frasi), posizione salvata tornando indietro, link dei video, codici personali e di gruppo (andata e ritorno, CRC errato rifiutato, niente battito né età), sfida del mese identica per lo stesso mese, decoder FIT con un file generato apposta, backup e ripristino, coerenza della libreria e delle traduzioni, inglese con le stesse chiavi dell'italiano, manubrio singolo e kettlebell, andamento, carico della settimana e battito di recupero, import in stile Suunto, battiti per giro e progressione a parità di circuito, pulizia dei codici ricevuti, repertorio degli esercizi, assenza di chiamate di rete, figure animate (ossa di lunghezza costante, niente sotto il pavimento, regole delle prove rispettate).
 
 Le schermate si provano con `node tests/schermate.mjs`: apre l'app in un browser a 390 px, tema scuro e chiaro, e controlla che ogni schermata si apra senza errori, più i percorsi principali. È facoltativa e serve Playwright; le istruzioni sono in cima al file.
 
@@ -251,6 +251,10 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 
 - Il campo `video` degli esercizi è vuoto per tutti: non sono stati inventati link. Un link che non è un indirizzo `https` di YouTube viene ignorato.
 - Posizione salvata: ogni pagina aperta riceve un numero nella cronologia del browser. Tornando indietro (freccia dell'app, tasto indietro di Android, gesto di iOS) la pagina riparte da dove era; aprendo una pagina nuova, o andando avanti con il browser, si parte dall'alto. Le frecce "indietro" delle intestazioni tornano davvero indietro nella cronologia quando la pagina precedente è quella attesa; altrimenti aprono la pagina madre dall'alto. Anche "Salva" in una voce del Profilo riporta al Profilo nel punto in cui era (tranne quando la modifica richiede di rivedere il piano). Le posizioni restano in memoria finché l'app è aperta, e sopravvivono a una ricarica.
+
+**Versione 1.0.8**
+
+- *Testo non selezionabile.* Tenendo premuto, il testo dell'interfaccia non si evidenzia più: in un'app installata è una distrazione, e durante un allenamento capita per sbaglio (sul tasto +1, sul contatore dei giri). Restano selezionabili, perché lì copiare serve: i campi in cui si scrive, i codici della classifica e le note del report. Su iPhone sparisce anche il menu che compare tenendo premuto un link.
 
 **Versione 1.0.7**
 

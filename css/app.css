@@ -16,6 +16,9 @@
   --art: #AE4C00; --ars: #FFE8D6; color-scheme: light;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* Come in un'app: tenendo premuto, il testo dell'interfaccia non si seleziona (in allenamento succede per sbaglio). Restano selezionabili campi, codici e note. */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, select, .codice, .selezionabile { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 html, body { margin: 0; height: 100%; }
 body { background: var(--bg); color: var(--txt); font-family: var(--f); font-size: 15px; line-height: 1.4; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
 button, input, select, textarea { font: inherit; color: inherit; }

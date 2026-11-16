@@ -585,6 +585,11 @@ prova('il disegno: animato o fermo, con il testo per lo screen reader e senza ni
   vero(fuori(gatto) > 5 && fuori(dritto) < 1e-9, 'curva della schiena');
 });
 
+prova('il testo dell\'interfaccia non si seleziona, ma campi, codici e note sì', () => {
+  const css = readFileSync(join(radice, 'css/app.css'), 'utf8');
+  vero(/body \{[^}]*user-select: none/.test(css), 'manca user-select: none sul corpo della pagina');
+  vero(/input, textarea, select, \.codice, \.selezionabile \{[^}]*-webkit-user-select: text; user-select: text/.test(css), 'i campi devono restare selezionabili (su iPhone altrimenti non ci si scrive)');
+});
 prova('settimana ISO e lunedì', () => { uguale(settimanaISO('2026-11-16'), '2026-W47'); uguale(settimanaISO('2027-01-01'), '2026-W53'); uguale(lunedi('2026-11-22'), '2026-11-16'); });
 
 await new Promise(r => setTimeout(r, 50));

@@ -102,6 +102,10 @@ for (const tema of ['dark', 'light']) {
   esito('anteprima di una figura sola, con i fotogrammi', (await page.locator('.quadri svg').count()) === 8);
   await vai('oggi');
 
+  // Testo dell'interfaccia non selezionabile, campi sì
+  await vai('modifica/chi');
+  esito('il testo non si seleziona, i campi sì', await page.evaluate(() => getComputedStyle(document.querySelector('h1')).userSelect === 'none' && getComputedStyle(document.querySelector('input')).userSelect === 'text'));
+
   // Lingua
   await vai('profilo'); await page.click('[data-a="lingua"][data-v="en"]'); await pausa(250);
   esito('inglese dal Profilo', (await page.locator('#nav a[href="#/oggi"]').innerText()) === 'Today');

@@ -122,7 +122,7 @@ registra('report', ([id]) => {
         ${cf ? `${tabellaConfronto(s, cf)}${cf.circuitoDiverso ? `<p class="pic sec">${t('rep.circuitoDiverso')}</p>` : ''}<a class="btn piccolo" href="#/report/${encodeURIComponent(cf.id)}" style="align-self:flex-start">${t('rep.apriPrecedente')}</a>` : `<p class="pic sec">${t('rep.primaVolta')}</p>`}</div>
       ${c && c.curva ? '' : `<div class="card avviso"><span class="tondo">${ico('orologio')}</span><div class="col stretti cresce"><h3>${t('rep.aggiungiOrologio')}</h3><p class="pic sec">${t('rep.aggiungiOrologioTesto')}</p>
         <a class="btn piccolo" href="#/orologi" style="align-self:flex-start;margin-top:4px">${t('oro.importa')}</a></div></div>`}
-      ${s.note || (s.fastidi || []).length ? `<div class="card col stretti"><h3>${t('rep.note')}</h3>${s.note ? `<p style="white-space:pre-wrap">${esc(s.note)}</p>` : ''}
+      ${s.note || (s.fastidi || []).length ? `<div class="card col stretti"><h3>${t('rep.note')}</h3>${s.note ? `<p class="selezionabile" style="white-space:pre-wrap">${esc(s.note)}</p>` : ''}
         ${(s.fastidi || []).length ? `<p class="pic sec">${t('rep.fastidi', { nomi: s.fastidi.map(nomeEsercizio).join(', ') })}</p>` : ''}</div>` : ''}
       <button class="btn primario largo" data-a="condividi">${ico('condividi')}${t('rep.condividi')}</button>
       <div class="fila stretti"><button class="btn cresce" data-a="correggi">${ico('matita', 18)}${t('rep.correggi')}</button><button class="btn pericolo" data-a="elimina">${ico('cestino', 18)}${t('rep.elimina')}</button></div></main>`,
