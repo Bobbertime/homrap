@@ -1,6 +1,6 @@
 // Service worker: mette in cache l'app al primo avvio, così dopo funziona offline.
 // IMPORTANTE: a ogni modifica dei file cambia VERSIONE, altrimenti i telefoni continuano a usare la copia vecchia.
-const VERSIONE = 'homrap-1.0.8';
+const VERSIONE = 'homrap-1.0.10';
 const FILE = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/router.js', './js/ui.js', './js/util.js', './js/db.js', './js/stato.js', './js/i18n.js', './js/audio.js',

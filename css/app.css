@@ -159,6 +159,32 @@ label.campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .contatore input.gigante { width: 150px; min-width: 0; height: 128px; padding: 0; border: 0; border-bottom: 3px dashed var(--lin); border-radius: 0; background: none; text-align: center; -moz-appearance: textfield; appearance: textfield; }
 .contatore input.gigante:focus { outline: none; border-bottom-color: var(--ar); }
 .contatore input::-webkit-outer-spin-button, .contatore input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.aiuto { position: relative; width: 36px; height: 36px; border-radius: 999px; background: var(--sup2); color: var(--txt); font-family: var(--fn); font-weight: 800; font-size: 22px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.aiuto::after { content: ''; position: absolute; inset: -5px; }   /* area di tocco di 46 px */
+.es-carta { position: relative; }
+.es-carta > .aiuto { position: absolute; top: 8px; right: 8px; }
+.es-carta > .card > .fila:first-child { padding-right: 42px; }
+.crono { padding: 8px 10px 8px 16px; }
+.crono .num { font-size: 36px; line-height: 1; }
+.crono .btn { min-width: 132px; min-height: 46px; padding: 0 18px; }
+/* Schermata dell'AMRAP: alta quanto lo schermo, così «+1 GIRO» resta sempre intero in vista. È l'unico blocco che si accorcia (fino a 92 px). */
+.pagina.amrap { height: 100vh; height: 100dvh; min-height: 0; }
+.pagina.amrap > * { flex-shrink: 0; }
+.pagina.amrap > .piu-giro { flex: 0 1 172px; min-height: 92px; }
+@media (max-height: 760px) {
+  .pagina.amrap { gap: 10px; padding-top: calc(14px + env(safe-area-inset-top)); }
+  .amrap .tempo { font-size: 76px; }
+  .amrap .segmenti { margin-top: 6px; }
+  .amrap .giro-box { padding: 10px 12px; }
+  .amrap .giro-box .num { font-size: 64px; }
+  .amrap .stat { padding: 2px 0; }
+  .amrap .stat .num { font-size: 19px; }
+  .amrap .card.col { gap: 6px; padding-top: 10px; padding-bottom: 10px; }
+  .amrap .btn.testo.piccolo { min-height: 32px; }
+  .amrap .crono .num { font-size: 30px; }
+  .amrap .es-carta > .aiuto { top: 5px; width: 32px; height: 32px; font-size: 20px; }
+}
+@media (max-height: 660px) { .amrap .tempo { font-size: 64px; } .amrap .giro-box .num { font-size: 54px; } .amrap .crono .btn { min-height: 40px; } }
 .contatore .meno { flex: 0 0 56px; width: 56px; height: 56px; border-radius: 999px; background: var(--sup); font-size: 32px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 .contatore .piu { flex: 0 0 104px; height: 96px; padding: 0; border-radius: 32px; background: var(--ar); color: var(--su-ar); font-family: var(--fn); font-weight: 800; font-size: 48px; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
 

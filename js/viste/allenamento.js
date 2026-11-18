@@ -2,7 +2,7 @@
 import { S, salva, salvaSessione, contesto, oggi } from '../stato.js';
 import { t, tn, nomeEsercizio } from '../i18n.js';
 import { registra, vai, disegna, rotta, vistaAttuale } from '../router.js';
-import { esc, ico, icoPlay, icoPausa, foglio, toast, fmtQ, fmtPunti, fmtData, fmtDec, condividiFile } from '../ui.js';
+import { esc, ico, icoPlay, icoPausa, foglio, toast, conferma, fmtQ, fmtPunti, fmtData, fmtDec, condividiFile, tastoAiuto, foglioAiuto, figuraAnimata, alternaFigura } from '../ui.js';
 import { prossimo, circuitoSessione, sostituisci, ripPerGiro, obiettivoGiri, giriEq, aggiornaTempi, alternative, serieGiorni } from '../logica.js';
 import { sfidaDelMese } from '../classifica.js';
 import { PER_ID } from '../../data/esercizi.js';
@@ -47,16 +47,25 @@ function passiRiscaldamento() {
 }
 const passiDefaticamento = () => [{ id: 'novanta_novanta', sec: 45 }, { id: 'rotazioni_toraciche', sec: 45 }, { id: 'cat_cow', sec: 45 }, { testo: 'respiro', sec: 45 }];
 const nomePasso = p => p.testo ? t('all.' + p.testo) : p.lento ? t('all.lento', { nome: nomeEsercizio(p.id) }) : nomeEsercizio(p.id);
+// Tra un passo e l'altro: 10 secondi per cambiare posizione (da in piedi a terra, da un lato all'altro) prima che parta il tempo.
+const CAMBIO_SEC = 10;
+const minutiGuida = passi => Math.round((passi.reduce((s, p) => s + p.sec, 0) + CAMBIO_SEC * (passi.length - 1)) / 60);
 function avviaGuida(tipo) {
-  A.fase = 'guida'; A.guida = { tipo, passi: tipo === 'riscaldamento' ? passiRiscaldamento() : passiDefaticamento(), i: 0, t0: ora(), pausaDa: null };
+  A.fase = 'guida'; A.guida = { tipo, passi: tipo === 'riscaldamento' ? passiRiscaldamento() : passiDefaticamento(), i: 0, t0: ora(), pausaDa: null, cambio: false, bip: {} };
   schermoAcceso(true); parla(`${t('all.' + tipo)}. ${nomePasso(A.guida.passi[0])}`);
   avviaTic(); disegna(false);
 }
-function prossimoPasso() {
+function prossimoPasso() {   // fine di un passo (o «Avanti»): prima il cambio di posizione, poi il passo dopo
   const g = A.guida;
-  g.i++; g.t0 = ora(); g.pausaDa = null;
-  if (g.i >= g.passi.length) return fineGuida();
-  bip(990, 0.2); vibra(80); parla(nomePasso(g.passi[g.i]));
+  if (g.i + 1 >= g.passi.length) return fineGuida();
+  g.cambio = true; g.t0 = ora(); g.pausaDa = null; g.bip = {};
+  bip(880, 0.15); vibra(80); parla(t('all.cambioVoce', { nome: nomePasso(g.passi[g.i + 1]) }));
+  disegna(false);
+}
+function iniziaPasso() {   // fine del cambio di posizione (o «Sono pronto»): parte il tempo del passo
+  const g = A.guida;
+  g.cambio = false; g.i++; g.t0 = ora(); g.pausaDa = null; g.bip = {};
+  bip(990, 0.2); vibra(80); parla(t('voce.via'));
   disegna(false);
 }
 function fineGuida() {
@@ -71,13 +80,22 @@ function pronti() {
 }
 
 // ───────────────────────── Timer
+// Timer dell'esercizio a tempo (plank 30"): conta sul tempo dell'AMRAP, quindi si ferma da solo con la pausa.
+// Vale solo per l'esercizio e il giro in cui è partito; «Da capo» lo fa ripartire da zero.
+const cronoValido = () => (A.crono && A.crono.i === A.exIdx && A.crono.g === A.giri.length ? A.crono : null);
+const restaCrono = () => { const c = cronoValido(), q = A.esercizi[A.exIdx].q; return c && c.da != null ? Math.max(0, q - (trascorso() - c.da)) : q; };
+// Ricomincia l'AMRAP da zero: tempo pieno e giri azzerati. Quello fatto prima non conta, quindi il risultato non può uscirne gonfiato.
+function ricominciaAmrap() {
+  Object.assign(A, { giri: [], exIdx: 0, exDa: 0, tempiEx: {}, pausaTot: 0, pausaDa: null, t0: 0, crono: null, detto: {}, fase: 'conto', contoDa: ora() });
+  vibra(60); ricorda(); schermoAcceso(true); avviaTic(); disegna(false);
+}
 function batti() {
   if (!A) return fermaTic();
   if (A.fase === 'guida') {
     const g = A.guida; if (g.pausaDa) return;
-    const r = g.passi[g.i].sec - (ora() - g.t0) / 1000;
-    if (r <= 0) return prossimoPasso();
-    if (r <= 3) { const k = 'g' + g.i + Math.ceil(r); if (!g[k]) { g[k] = 1; bip(880, 0.08); } }
+    const r = (g.cambio ? CAMBIO_SEC : g.passi[g.i].sec) - (ora() - g.t0) / 1000;
+    if (r <= 0) return g.cambio ? iniziaPasso() : prossimoPasso();
+    if (r <= 3) { const k = Math.ceil(r); g.bip = g.bip || {}; if (!g.bip[k]) { g.bip[k] = 1; bip(880, 0.08); } }
     setTesto('g-tempo', mmss(Math.ceil(r)));
   } else if (A.fase === 'conto') {
     const n = 3 - Math.floor((ora() - A.contoDa) / 1000);
@@ -97,6 +115,13 @@ function batti() {
     if (r <= 60) unaVolta('uno', () => { parla(t('voce.ultimoMinuto')); vibra(100); });
     if (r <= 10) { unaVolta('dieci', () => parla(t('voce.dieci'))); if (r < 9.5) unaVolta('b' + Math.ceil(r), () => bip(r <= 3 ? 1100 : 880, 0.1)); }
     setTesto('a-tempo', mmss(Math.ceil(r)));
+    const c = cronoValido();
+    if (c && c.da != null) {
+      const rc = A.esercizi[A.exIdx].q - (s - c.da);
+      if (rc <= 0) { c.da = null; c.fatti++; bip(1320, 0.3); vibra([120, 80, 120]); parla(t('voce.stop')); ricorda(); return disegna(); }
+      if (rc <= 3) unaVolta('cr' + c.volte + '-' + Math.ceil(rc), () => bip(880, 0.08));
+      setTesto('a-crono', mmss(Math.ceil(rc)));
+    }
     const seg = document.getElementById('a-seg');
     if (seg) { const n = Math.floor(s / tot * 20); if (seg.dataset.n !== String(n)) { seg.dataset.n = n; [...seg.children].forEach((el, i) => { el.className = i < n ? 'f' : i === n ? 'c' : ''; }); } }
   }
@@ -164,39 +189,64 @@ function vistaAnteprima() {
     ${sf ? '' : `<p class="pic sec">${t('all.toccaPerCambiare')}</p>`}
     <div class="col stretti"><h3>${t('all.modalita')}</h3><div class="seg">${['app', 'orologio'].map(m => `<button data-a="modalita" data-v="${m}" aria-pressed="${A.modalita === m}">${t('all.modo.' + m)}</button>`).join('')}</div>
       ${A.modalita === 'orologio' ? `<p class="pic sec">${t('all.modoOrologioTesto')}</p>` : ''}</div>
-    <div class="fondo-fisso"><button class="btn primario largo" data-a="riscaldamento">${icoPlay()}${t('all.iniziaRiscaldamento')}</button><button class="btn testo largo" data-a="salta">${t('all.saltaRiscaldamento')}</button></div>`;
+    <div class="fondo-fisso"><button class="btn primario largo" data-a="riscaldamento">${icoPlay()}${t('all.iniziaRiscaldamento', { min: minutiGuida(passiRiscaldamento()) })}</button><button class="btn testo largo" data-a="salta">${t('all.saltaRiscaldamento')}</button></div>`;
 }
+const nomeConAiuto = (p, dim) => `<div class="fila" style="justify-content:center;gap:10px"><h1 style="font-size:${dim}px">${esc(nomePasso(p))}</h1>${p.id ? tastoAiuto(p.id) : ''}</div>`;
 function vistaGuida() {
   const g = A.guida, p = g.passi[g.i], dopo = g.passi[g.i + 1];
+  const pausaGuida = `<button class="ico-btn" data-a="pausaGuida" aria-label="${t(g.pausaDa ? 'all.riprendi' : 'all.pausa')}">${g.pausaDa ? icoPlay(18) : icoPausa()}</button>`;
+  const salta = `<button class="btn testo largo" data-a="saltaGuida">${t(g.tipo === 'riscaldamento' ? 'all.saltaRiscaldamento' : 'all.saltaDefaticamento')}</button>`;
+  if (g.cambio) {   // 10 secondi per mettersi in posizione: si vede già il passo dopo, con la sua figura
+    const consiglio = dopo.id ? t('esercizi.' + dopo.id + '.consigli')[0] : t('all.respiroTesto');
+    return `${testa(`${t('all.' + g.tipo)} · ${g.i + 2}/${g.passi.length}`, pausaGuida, 'saltaGuida')}
+    ${trattini(g.passi.length, g.i + 1)}
+    <div class="spazio"></div>
+    <div class="centro col stretti"><p class="sec forte">${t(g.pausaDa ? 'all.inPausa' : 'all.cambio')}</p>${nomeConAiuto(dopo, 30)}
+      <div class="tempo medio art" id="g-tempo">${mmss(Math.ceil(CAMBIO_SEC - ((g.pausaDa || ora()) - g.t0) / 1000))}</div></div>
+    ${dopo.id ? figuraAnimata(dopo.id, nomeEsercizio(dopo.id), 'bassa') : ''}
+    <p class="sec centro">${esc(consiglio)}</p>
+    <div class="spazio"></div>
+    <button class="btn primario largo" data-a="avantiGuida">${t('all.cambioPronto')}</button>${salta}`;
+  }
   const consiglio = p.id ? t('esercizi.' + p.id + '.consigli')[0] : t('all.respiroTesto');
-  return `${testa(`${t('all.' + g.tipo)} · ${g.i + 1}/${g.passi.length}`, `<button class="ico-btn" data-a="pausaGuida" aria-label="${t('all.pausa')}">${g.pausaDa ? icoPlay(18) : icoPausa()}</button>`, 'saltaGuida')}
+  return `${testa(`${t('all.' + g.tipo)} · ${g.i + 1}/${g.passi.length}`, pausaGuida, 'saltaGuida')}
     ${trattini(g.passi.length, g.i)}
     <div class="spazio"></div>
-    <div class="centro"><h1 style="font-size:34px">${esc(nomePasso(p))}</h1><div class="tempo" id="g-tempo" style="margin-top:10px">${mmss(Math.ceil(p.sec - ((g.pausaDa || ora()) - g.t0) / 1000))}</div>
-      <p class="sec" style="margin-top:10px">${esc(consiglio)}</p></div>
+    <div class="centro">${nomeConAiuto(p, 34)}<div class="tempo" id="g-tempo" style="margin-top:10px">${mmss(Math.ceil(p.sec - ((g.pausaDa || ora()) - g.t0) / 1000))}</div>
+      <p class="sec" style="margin-top:10px">${esc(consiglio)}</p>
+      <button class="btn testo piccolo" data-a="ricominciaPasso" style="margin-top:6px">${ico('ricarica', 18)}${t('all.ricominciaPasso')}</button></div>
     <div class="spazio"></div>
     <div class="card fila tra"><span class="sec forte">${dopo ? t('all.dopo', { nome: nomePasso(dopo) }) : t('all.ultimoPasso')}</span><button class="btn piccolo" data-a="avantiGuida">${t('all.prossimo')}</button></div>
-    <button class="btn testo largo" data-a="saltaGuida">${t(g.tipo === 'riscaldamento' ? 'all.saltaRiscaldamento' : 'all.saltaDefaticamento')}</button>`;
+    ${salta}`;
 }
 function vistaAmrap() {
   const tot = A.durata * 60, s = trascorso(), n = Math.floor(s / tot * 20), st = statistiche(), x = A.esercizi[A.exIdx], dopo = A.esercizi[A.exIdx + 1];
   const tempo = `<div><div class="pic forte sec">${t(A.pausaDa ? 'all.inPausa' : 'all.rimanente')}</div><div class="tempo ${A.pausaDa ? 'sec' : ''}" id="a-tempo">${mmss(Math.ceil(tot - s))}</div>
     <div class="segmenti" id="a-seg" data-n="${n}" aria-hidden="true">${Array.from({ length: 20 }, (_, i) => `<i class="${i < n ? 'f' : i === n ? 'c' : ''}"></i>`).join('')}</div></div>`;
   const pausa = `<button class="ico-btn" data-a="pausa" aria-label="${t(A.pausaDa ? 'all.riprendi' : 'all.pausa')}">${A.pausaDa ? icoPlay(18) : icoPausa()}</button>`;
-  if (A.modalita === 'orologio') return `${testa(`AMRAP ${A.durata}' · ${titolo()}`, pausa)}${tempo}${listaGrande()}<div class="spazio"></div><button class="btn primario largo" data-a="hoFinito">${t('all.hoFinito')}</button>`;
-  return `${testa(`AMRAP ${A.durata}' · ${titolo()}`, pausa)}${tempo}
+  // in pausa compare «Ricomincia da zero»: per chi si è accorto di qualcosa (una collana, il telefono messo male) e vuole ripartire pulito
+  const daCapo = A.pausaDa ? `<button class="btn testo piccolo" data-a="ricomincia" style="align-self:center">${ico('ricarica', 18)}${t('all.ricomincia')}</button>` : '';
+  if (A.modalita === 'orologio') return `${testa(`AMRAP ${A.durata}' · ${titolo()}`, pausa)}${tempo}${daCapo}${listaGrande()}<div class="spazio"></div><button class="btn primario largo" data-a="hoFinito">${t('all.hoFinito')}</button>`;
+  return `${testa(`AMRAP ${A.durata}' · ${titolo()}`, pausa)}${tempo}${daCapo}
     <div class="fila" style="align-items:stretch"><div class="giro-box"><span>${t('all.giro')}</span><span class="num" id="a-giro">${A.giri.length + 1}</span></div>
       <div class="card cresce" style="display:flex;flex-direction:column;justify-content:center;padding:8px 16px">
         <div class="stat"><span>${t('all.mediaGiro')}</span><span class="num">${st.media}</span></div><div class="stat"><span>${t('all.proiezione')}</span><span class="num">${st.proiezione}</span></div><div class="stat"><span>${t('all.obiettivo')}</span><span class="num">${A.obiettivo}</span></div></div></div>
-    <button class="card col" data-a="esercizio" style="gap:10px;text-align:left;width:100%" aria-label="${t('all.prossimoEsercizio')}">
+    <div class="es-carta"><button class="card col" data-a="esercizio" style="gap:10px;text-align:left;width:100%" aria-label="${t('all.prossimoEsercizio')}">
       <span class="fila tra"><span class="pic forte art">${t('all.oraDi', { i: A.exIdx + 1, n: A.esercizi.length })}</span>${trattini(A.esercizi.length, A.exIdx)}</span>
       <span class="fila tra base"><span style="font-size:${nomeEsercizio(x.id).length > 16 ? 22 : 30}px;font-weight:800;letter-spacing:-.5px;line-height:1.05">${esc(nomeEsercizio(x.id))}</span><span class="num art" style="font-weight:800;font-size:42px;line-height:1;white-space:nowrap">${PER_ID[x.id].unita === 'sec' ? '' : '×'}${fmtQ(x.id, x.q)}</span></span>
-      <span class="fila tra sec" style="border-top:1px solid var(--lin);padding-top:10px;font-size:14px;font-weight:600"><span>${dopo ? t('all.dopo', { nome: nomeEsercizio(dopo.id) }) : t('all.poiGiro')}</span><span>${dopo ? fmtVoce(dopo) : ''}${x.kg != null ? ` ${x.kg} kg` : ''}</span></span></button>
+      <span class="fila tra sec" style="border-top:1px solid var(--lin);padding-top:10px;font-size:14px;font-weight:600"><span>${dopo ? t('all.dopo', { nome: nomeEsercizio(dopo.id) }) : t('all.poiGiro')}</span><span>${dopo ? fmtVoce(dopo) : ''}${x.kg != null ? ` ${x.kg} kg` : ''}</span></span></button>${tastoAiuto(x.id)}</div>
+    ${PER_ID[x.id].unita === 'sec' ? cartaCrono(x) : ''}
     ${A.giri.length ? `<button class="btn testo piccolo" data-a="annullaGiro" style="align-self:center">${t('all.annullaGiro')}</button>` : ''}
     <div class="spazio"></div>
     <button class="piu-giro" data-a="giro" ${A.pausaDa ? 'disabled' : ''}><span class="num">${t('all.piuGiro')}</span><span>${t('all.piuGiroTesto')}</span></button>`;
 }
-const listaGrande = () => `<div class="col stretti">${A.esercizi.map((x, i) => `<div class="riga alta"><span class="tondo ${x.slot === 'focus' ? 'ar' : ''}">${i + 1}</span><span class="cresce" style="font-size:20px;font-weight:800">${esc(nomeEsercizio(x.id))}</span><span class="num art" style="font-size:34px;font-weight:800;line-height:1">${fmtVoce(x)}</span></div>`).join('')}</div>
+function cartaCrono(x) {
+  const c = cronoValido(), va = !!(c && c.da != null), fatto = !va && c && c.fatti;
+  const etichetta = va ? t('all.cronoDaCapo') : fatto ? t(PER_ID[x.id].lato && c.fatti === 1 ? 'all.cronoAltroLato' : 'all.cronoDiNuovo') : t('all.cronoAvvia');
+  return `<div class="card fila tra crono"><div><div class="pic forte ${fatto ? 'art' : 'sec'}">${fatto ? `${ico('spunta', 14)} ${t('all.cronoFatto')}` : t('all.cronoTitolo')}</div><div class="num ${va ? '' : 'sec'}" id="a-crono">${mmss(Math.ceil(restaCrono()))}</div></div>
+    <button class="btn ${va ? '' : 'primario'}" data-a="crono">${va ? ico('ricarica', 18) : icoPlay()}${etichetta}</button></div>`;
+}
+const listaGrande = () => `<div class="col stretti">${A.esercizi.map((x, i) => `<div class="riga alta"><span class="tondo ${x.slot === 'focus' ? 'ar' : ''}">${i + 1}</span><span class="cresce" style="font-size:20px;font-weight:800">${esc(nomeEsercizio(x.id))}</span><span class="num art" style="font-size:34px;font-weight:800;line-height:1">${fmtVoce(x)}</span>${tastoAiuto(x.id)}</div>`).join('')}</div>
   <div class="card tenue avviso"><span class="tondo">${ico('orologio')}</span><p class="forte">${t('all.premiLap')}</p></div>`;
 function vistaOrologio() {
   return `${testa(`AMRAP ${A.durata}' · ${titolo()}`)}<h1>${t('all.orologioTitolo')}</h1>${listaGrande()}
@@ -234,7 +284,7 @@ function vistaRiepilogo() {
     ${sugg ? cartaSuggerimento(sugg) : ''}
     <a class="btn largo" href="#/report/${encodeURIComponent(s.id)}">${ico('battito')}${t('rep.apri')}</a>
     <button class="btn largo" data-a="condividi">${ico('condividi')}${t('riep.condividi')}</button>
-    <div class="fondo-fisso"><button class="btn primario largo" data-a="defaticamento">${t('riep.defaticamento')}</button><button class="btn testo largo" data-a="chiudi">${t('riep.salta')}</button></div>`;
+    <div class="fondo-fisso"><button class="btn primario largo" data-a="defaticamento">${t('riep.defaticamento', { min: minutiGuida(passiDefaticamento()) })}</button><button class="btn testo largo" data-a="chiudi">${t('riep.salta')}</button></div>`;
 }
 
 registra('allenamento', ([cosa = 'giorno']) => {
@@ -245,17 +295,19 @@ registra('allenamento', ([cosa = 'giorno']) => {
   if (!A && vistaAttuale() === 'report') return { html: '', dopo: () => vai('oggi', true) };   // sessione cancellata dal report: niente nuovo allenamento a sorpresa
   if (!A || A.cosa !== cosa) crea(cosa);
   if (A.fase === 'amrap' && !tic) { schermoAcceso(true); avviaTic(); }
+  if (A.fase === 'conto' && !tic) { A.contoDa = ora(); A.detto = {}; schermoAcceso(true); avviaTic(); }
   const corpo = { anteprima: vistaAnteprima, guida: vistaGuida, conto: () => `<div class="spazio"></div><div class="centro"><p class="sec forte">${t('all.pronti')}</p><div class="gigante art" id="a-conto" style="font-size:220px">3</div></div><div class="spazio"></div>`,
     amrap: vistaAmrap, orologio: vistaOrologio, fine: vistaFine, riepilogo: vistaRiepilogo }[A.fase]();
   const passo = (i, d) => { const x = A.esercizi[i], st = PER_ID[x.id].unita === 'sec' ? 5 : 1; A.form.extra[i] = Math.max(0, Math.min(x.q, A.form.extra[i] + d * st)); disegna(); };
   return {
-    html: `<main class="pagina piena">${corpo}</main>`,
+    html: `<main class="pagina piena${A.fase === 'amrap' && A.modalita === 'app' ? ' amrap' : ''}">${corpo}</main>`,
     azioni: {
       esci: () => {
         if (A.fase === 'anteprima') { A = null; return vai('oggi'); }
         foglio(`<h2 style="margin:0">${t('all.esciTitolo')}</h2><p class="sec">${t('all.esciTesto')}</p>
-          <button class="btn primario largo" data-a="chiudi">${t('comune.continua')}</button><button class="btn largo" data-a="termina">${t('all.termina')}</button><button class="btn pericolo largo" data-a="scarta">${t('all.scarta')}</button>`,
+          <button class="btn primario largo" data-a="chiudi">${t('comune.continua')}</button>${A.fase === 'amrap' ? `<button class="btn largo" data-a="ricomincia">${ico('ricarica', 18)}${t('all.ricomincia')}</button>` : ''}<button class="btn largo" data-a="termina">${t('all.termina')}</button><button class="btn pericolo largo" data-a="scarta">${t('all.scarta')}</button>`,
         { termina: (e, ev, chiudi) => { chiudi(); fineAmrap(false); },
+          ricomincia: (e, ev, chiudi) => { chiudi(); if (A && A.fase === 'amrap') ricominciaAmrap(); },
           scarta: async (e, ev, chiudi) => { chiudi(); fermaTic(); schermoAcceso(false); A = null; S.attivo = null; await salva('attivo'); vai('oggi'); } });
       },
       variante: el => { A.variante = el.dataset.v; usaVariante(); disegna(); },
@@ -275,7 +327,13 @@ registra('allenamento', ([cosa = 'giorno']) => {
       riscaldamento: () => { sbloccaAudio(); avviaGuida('riscaldamento'); },
       salta: () => { sbloccaAudio(); pronti(); },
       pausaGuida: () => { const g = A.guida; if (g.pausaDa) { g.t0 += ora() - g.pausaDa; g.pausaDa = null; } else g.pausaDa = ora(); disegna(); },
-      avantiGuida: prossimoPasso,
+      avantiGuida: () => (A.guida.cambio ? iniziaPasso() : prossimoPasso()),
+      aiuto: el => {   // il tempo non si ferma: lo dice il foglio, e chi vuole mette in pausa
+        const x = (A.esercizi || []).find(y => y.id === el.dataset.id), inGara = ['amrap', 'orologio'].includes(A.fase);
+        foglioAiuto(el.dataset.id, { quantita: inGara && x ? fmtVoce(x) : '', nota: A.fase === 'amrap' && !A.pausaDa ? t('aiuto.nota') : '' });
+      },
+      figura: alternaFigura,
+      ricominciaPasso: () => { const g = A.guida; g.t0 = ora(); if (g.pausaDa) g.pausaDa = ora(); g.bip = {}; vibra(20); disegna(); },
       saltaGuida: fineGuida,
       giro: () => {
         if (A.pausaDa || ora() - ultimoTocco < 1500) return;
@@ -287,6 +345,14 @@ registra('allenamento', ([cosa = 'giorno']) => {
       annullaGiro: () => { A.giri.pop(); ricorda(); disegna(); },
       esercizio: () => { if (A.exIdx >= A.esercizi.length - 1) return toast(t('all.toccaGiro')); segnaEsercizio(); A.exIdx++; vibra(20); ricorda(); disegna(); },
       pausa: () => { if (A.pausaDa) { A.pausaTot += ora() - A.pausaDa; A.pausaDa = null; } else A.pausaDa = ora(); ricorda(); disegna(); },
+      ricomincia: async () => {
+        const ok = await conferma(t('all.ricominciaTitolo'), t('all.ricominciaTesto', { tempo: mmss(A.durata * 60) }), t('all.ricominciaOk'), t('comune.annulla'));
+        if (ok && A && A.fase === 'amrap') ricominciaAmrap();
+      },
+      crono: () => {   // Avvia, oppure «Da capo»: il timer dell'esercizio riparte da zero
+        const c = cronoValido() || (A.crono = { i: A.exIdx, g: A.giri.length, da: null, fatti: 0, volte: 0 });
+        c.da = trascorso(); c.volte++; vibra(20); ricorda(); disegna();
+      },
       timerFacoltativo: () => { sbloccaAudio(); A.fase = 'conto'; A.contoDa = ora(); A.detto = {}; avviaTic(); disegna(); },
       hoFinito: () => fineAmrap(false),
       giriMeno: () => { A.form.giri = Math.max(0, A.form.giri - 1); disegna(); },

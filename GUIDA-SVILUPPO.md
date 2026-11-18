@@ -70,6 +70,8 @@ Prima di pubblicare: i test passano, la versione è cambiata, l'app si apre sul 
 - **Confronti onesti.** Giri e battiti si confrontano solo a parità di circuito (`chiaveCircuito` in `analisi.js`). Le sessioni interrotte, quelle a ripetizioni ridotte e i giri con una pausa restano fuori.
 - **File degli orologi.** Il battito mancante nei FIT vale 255 e va scartato; il tempo "trascorso" di un lap comprende le pause, quello "timer" no.
 - **Figure: interpolare i punti accorcia le ossa.** Tra due pose si interpolano gli angoli; un appoggio che deve restare fermo va dichiarato con `fissa`, altrimenti scivola. Un angolo scritto come 182 invece di −178 fa fare al braccio il giro dalla parte sbagliata: scrivi le due pose con angoli vicini tra loro.
+- **Schermata dell'allenamento.** È alta quanto lo schermo (`.pagina.amrap`) e solo «+1 GIRO» si accorcia: se aggiungi un blocco, controlla che il pulsante resti intero a 667 px. `tests/schermate.mjs` lo verifica.
+- **Ricominciare senza gonfiare i risultati.** Tutto ciò che fa ripartire un tempo da zero azzera anche il conteggio legato a quel tempo (giri, ripetizioni della prova): il risultato può solo uscire più basso, mai più alto.
 - **Nomi brevi nei moduli.** Il test delle traduzioni cerca nel codice le chiamate `t('…')`: una funzione locale chiamata `t` lo fa fallire.
 - **Date.** Si usano sempre le funzioni di `js/util.js` (`isoData`, `piuGiorni`, `lunedi`…), mai l'aritmetica a mano sui millisecondi: il cambio dell'ora sposta i giorni.
 

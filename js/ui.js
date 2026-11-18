@@ -1,5 +1,5 @@
 // Mattoncini dell'interfaccia: icone, fogli, avvisi, grafici, sagoma dei muscoli, condivisione.
-import { t, locale } from './i18n.js';
+import { t, locale, nomeEsercizio } from './i18n.js';
 import { PER_ID } from '../data/esercizi.js';
 import { mmss } from './util.js';
 import { svgFigura, haFigura } from './figure.js';
@@ -63,6 +63,23 @@ export function alternaFigura(el) {
   if (ferma) svg.pauseAnimations(); else svg.unpauseAnimations();
   el.setAttribute('aria-pressed', ferma ? 'true' : 'false');
   el.querySelector('.f-stato').innerHTML = ferma ? icoPlay(12) : icoPausa(14);
+}
+
+// ── «Come si fa»: tasto «?» e foglio con la figura animata e i consigli di un esercizio.
+// Si apre sopra la schermata (allenamento, riscaldamento) senza lasciarla: chi ha dimenticato un esercizio lo ripassa e torna dov'era.
+export const tastoAiuto = id => `<button class="aiuto" data-a="aiuto" data-id="${esc(id)}" aria-label="${esc(t('aiuto.apri', { nome: nomeEsercizio(id) }))}"><span aria-hidden="true">?</span></button>`;
+export function foglioAiuto(id, { quantita = '', nota = '' } = {}) {
+  const e = PER_ID[id];
+  if (!e) return null;
+  const T = k => t('esercizi.' + id + '.' + k), nome = nomeEsercizio(id), elenco = k => `<ul class="punti">${T(k).map(c => `<li>${esc(c)}</li>`).join('')}</ul>`;
+  return foglio(`<div class="fila tra"><h2 style="margin:0">${esc(nome)}</h2>${quantita ? `<span class="rip">${esc(quantita)}</span>` : ''}</div>
+    ${figuraAnimata(id, nome, 'bassa')}
+    ${e.avviso ? `<div class="card tenue avviso"><span class="tondo">${ico('attenzione')}</span><p class="pic forte">${esc(T('avviso'))}</p></div>` : ''}
+    <div class="col stretti"><h3>${t('esercizio.consigli')}</h3>${elenco('consigli')}</div>
+    <div class="col stretti"><h3>${t('esercizio.errori')}</h3>${elenco('errori')}</div>
+    <div class="col stretti"><h3>${t('esercizio.respiro')}</h3><p>${esc(T('respiro'))}</p></div>
+    ${nota ? `<p class="pic sec">${esc(nota)}</p>` : ''}
+    <button class="btn primario largo" data-a="chiudi">${t('aiuto.capito')}</button>`, { figura: alternaFigura });
 }
 
 // ── Formati

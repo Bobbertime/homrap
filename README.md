@@ -30,7 +30,7 @@ Il file vuoto `.nojekyll` dice a GitHub di pubblicare i file così come sono: la
 Dopo ogni modifica ai file, apri `sw.js` e cambia la riga
 
 ```js
-const VERSIONE = 'homrap-1.0.8';
+const VERSIONE = 'homrap-1.0.10';
 ```
 
 per esempio in `homrap-1.0.6` (e, se vuoi che si veda in fondo al Profilo, anche `VERSIONE` in `js/viste/profilo.js`). Senza questo passaggio i telefoni continuano a usare la copia vecchia. Con la versione nuova, alla riapertura l'app mostra "Nuova versione disponibile" con il pulsante **Ricarica**. Se aggiungi un file nuovo, aggiungilo anche all'elenco `FILE` in `sw.js` (c'è un test che lo controlla).
@@ -252,6 +252,24 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 - Il campo `video` degli esercizi è vuoto per tutti: non sono stati inventati link. Un link che non è un indirizzo `https` di YouTube viene ignorato.
 - Posizione salvata: ogni pagina aperta riceve un numero nella cronologia del browser. Tornando indietro (freccia dell'app, tasto indietro di Android, gesto di iOS) la pagina riparte da dove era; aprendo una pagina nuova, o andando avanti con il browser, si parte dall'alto. Le frecce "indietro" delle intestazioni tornano davvero indietro nella cronologia quando la pagina precedente è quella attesa; altrimenti aprono la pagina madre dall'alto. Anche "Salva" in una voce del Profilo riporta al Profilo nel punto in cui era (tranne quando la modifica richiede di rivedere il piano). Le posizioni restano in memoria finché l'app è aperta, e sopravvivono a una ricarica.
 
+**Versione 1.0.10**
+
+- *«?» durante l'allenamento.* Sulla scheda dell'esercizio in corso c'è un «?» nell'angolo: apre un foglio con la figura animata (se l'esercizio ce l'ha), i consigli sulla posizione, gli errori comuni, la respirazione ed eventuali avvertenze. Si chiude con «Ho capito» e si resta esattamente dov'eri: stesso esercizio, stesso giro. Lo stesso «?» c'è accanto a ogni esercizio nella modalità orologio e accanto al nome nel riscaldamento e nel defaticamento.
+- Il «?» sta fuori dal pulsante della scheda (che passa all'esercizio dopo), così toccarlo non fa avanzare il circuito. Ha un'area di tocco di 46 px anche se il cerchio è più piccolo.
+- Mentre il foglio è aperto il tempo dell'AMRAP continua: è un allenamento a tempo, e fermarlo da solo cambierebbe il risultato. Il foglio lo dice («se ti serve, metti in pausa»).
+- *Cambio di posizione nelle sequenze guidate.* Tra un esercizio e l'altro ci sono 10 secondi per mettersi in posizione, con un conto alla rovescia, il nome e la figura dell'esercizio che arriva e il primo consiglio; «Sono pronto» li salta. La voce annuncia «Cambia posizione. Prossimo: …» e poi «Via!». Anche «Avanti» durante un esercizio porta al cambio, non direttamente al passo dopo.
+- L'avevi chiesto per il defaticamento; l'ho messo anche nel riscaldamento, perché lì si passa allo stesso modo da in piedi a terra (step jack → cat-cow). Così il riscaldamento dura 6 minuti invece di 5 e il defaticamento circa 3 e mezzo: le etichette dei pulsanti ora calcolano la durata da sole.
+
+**Versione 1.0.9**
+
+- *Timer dell'esercizio a tempo.* Nell'allenamento, quando l'esercizio del momento è in secondi (plank 30", sedia al muro, cat-cow), sotto la sua scheda c'è un timer: «Avvia», poi «Da capo» per farlo ripartire da zero, e a fine tempo un bip, la vibrazione e la voce («Stop!»). Prima il tempo andava contato a occhio sull'orologio grande. Il timer usa lo stesso tempo dell'AMRAP, quindi si ferma da solo con la pausa; vale per l'esercizio e il giro in cui è partito. Negli esercizi per lato, finito il primo, il pulsante diventa «Altro lato».
+- *Ricominciare da zero, ovunque ci sia un tempo.* Il principio è quello chiesto: chi ricomincia può solo fare di più, mai risultare migliore di quanto ha fatto.
+  - *Prova del test:* durante la prova, «Ricomincia la prova da zero» riporta tempo e conteggio a zero e torna al pulsante di partenza, così ci si prende il tempo che serve (togliere una collana, sistemare il telefono). Il conteggio si azzera, altrimenti il risultato varrebbe più di 60 secondi.
+  - *AMRAP:* «Ricomincia da zero» compare quando metti in pausa, ed è anche nel foglio che si apre con la X. Il tempo torna pieno e i giri ripartono da uno: quelli fatti prima non contano, perché tenerli con il tempo azzerato gonfierebbe il risultato e falserebbe i confronti. Il riscaldamento fatto resta fatto: dopo 3 secondi di conto alla rovescia si riparte.
+  - *Riscaldamento e defaticamento:* «Ricomincia questo esercizio» riporta il passo al suo tempo pieno.
+  - Nel test e nell'AMRAP si chiede conferma, perché un tocco sbagliato costerebbe la prova; il timer dell'esercizio e il passo del riscaldamento ripartono subito.
+- *«+1 GIRO» sempre intero sullo schermo.* La schermata dell'allenamento ora è alta esattamente quanto lo schermo e «+1 GIRO» è l'unico blocco che si accorcia (fino a 92 px). Sotto i 760 px di altezza tempo, giro e statistiche diventano più compatti. Prima, dopo il primo giro, a 667–740 px quasi metà del pulsante finiva sotto il bordo.
+
 **Versione 1.0.8**
 
 - *Testo non selezionabile.* Tenendo premuto, il testo dell'interfaccia non si evidenzia più: in un'app installata è una distrazione, e durante un allenamento capita per sbaglio (sul tasto +1, sul contatore dei giri). Restano selezionabili, perché lì copiare serve: i campi in cui si scrive, i codici della classifica e le note del report. Su iPhone sparisce anche il menu che compare tenendo premuto un link.
@@ -324,6 +342,8 @@ Scelte fatte dallo sviluppatore dove il documento di progetto lasciava un margin
 
 ## 6. Limiti noti
 
+- **«?» e cambio di posizione (1.0.10):** provati in Chrome senza interfaccia a 390 px, alti 667 e 844, tema scuro e chiaro; non su un telefono vero. Il foglio del «?» mostra solo testi e figure che l'app ha già: per gli esercizi senza figura ci sono solo i consigli.
+- **Ricominciare e timer dell'esercizio (1.0.9):** provati in Chrome senza interfaccia a 390 px, alti 667 e 844, tema scuro e chiaro, in italiano e in inglese; non su un telefono vero. Se registri anche con l'orologio, quando ricominci l'AMRAP ricomincia anche lì (o almeno premi Lap): altrimenti il file contiene anche la partenza falsa e i lap non coincidono con i giri dell'app. Sotto i 650 px di altezza (iPhone SE di prima generazione, o il browser con le sue barre) «+1 GIRO» può restare tagliato di qualche pixel quando c'è il timer dell'esercizio.
 - **Figure animate (1.0.6):** provate con i test automatici e in Chrome senza interfaccia a 390 px, tema scuro e chiaro, anche con "riduci movimento"; non su un telefono vero. Usano l'animazione nativa dell'SVG, presente in Chrome, Safari e Firefox attuali; su un browser che non la avesse la figura resterebbe ferma nella posizione di partenza. Sono schematiche: non mostrano la larghezza dei piedi o delle mani, né gli errori da evitare, che restano nei testi. Dalla 1.0.7 hanno la figura 38 esercizi; gli altri 61 non ne hanno ancora una, e 13 di questi non si possono disegnare di profilo. Le figure aggiunte nella 1.0.7 sono state controllate una per una su fogli di fotogrammi, non in movimento su un telefono.
 - **Novità della 1.0.5** (import dall'orologio, battiti per giro, scheda Orologio, esercizi nuovi, caratteri dentro l'app): provate con i test automatici, con i quattro file veri del Suunto e con `tests/schermate.mjs` in Chrome senza interfaccia a 390 px, tema scuro e chiaro. Non provate su telefoni veri.
 - **Novità della 1.0.4** (manubrio singolo, correzione ed eliminazione delle sessioni, andamento, carico, battito di recupero, inglese): provate con i test automatici e in Chrome senza interfaccia a 390 px, tema scuro e chiaro. Non provate su telefoni veri.

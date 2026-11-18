@@ -104,13 +104,14 @@ registra('test', ([tipo = 'mensile']) => {
       <div class="spazio"></div><button class="btn largo" data-a="saltaRecupero">${t('test.saltaRecupero')}</button>`;
   } else {
     const inCorso = T.fase === 'via' || T.fase === 'conto', tenuta = p.tipo === 'tenuta', libera = p.tipo === 'max';
+    const daCapo = `<button class="btn testo largo" data-a="ricomincia">${ico('ricarica', 18)}${t('test.ricomincia')}</button>`;   // durante la prova: tempo e conteggio tornano a zero
     const titolo = p.id === 'trazioni' ? t('test.provaFacoltativa') : t('test.provaDi', { i: T.i + 1, n });
     let centro, sotto;
     if (T.fase === 'conto') { centro = `<div class="gigante centro art" id="t-tempo">3</div>`; sotto = ''; }
     else if (tenuta) {
       centro = `<div class="tempo centro" id="t-tempo">${mmss(T.fase === 'fatto' ? T.tenuta : 0)}</div>`;
       sotto = T.fase === 'pronto' ? `<div class="fondo-fisso"><button class="btn primario largo" data-a="via">${t('test.avvio')}</button></div>`
-        : T.fase === 'via' ? `<button class="piu-giro" data-a="stop" style="min-height:120px"><span class="num">${t('test.stop')}</span><span>${t('test.stopDesc')}</span></button>`
+        : T.fase === 'via' ? `<button class="piu-giro" data-a="stop" style="min-height:120px"><span class="num">${t('test.stop')}</span><span>${t('test.stopDesc')}</span></button>${daCapo}`
         : `<button class="btn primario largo" data-a="conferma">${t('comune.conferma')}</button><button class="btn largo" data-a="ripeti">${t('test.ripeti')}</button>`;
     } else {
       // A tempo scaduto (e nelle trazioni, che non hanno tempo) il numero si può anche scrivere: chi conta a mente non deve toccare +1 trenta volte.
@@ -119,7 +120,7 @@ registra('test', ([tipo = 'mensile']) => {
       const contatore = `<div class="contatore"><button class="meno" data-a="meno" aria-label="${t('test.meno')}">−</button>${numero}<button class="piu" data-a="piu" aria-label="${t('test.piu')}">+1</button></div>${scrivibile ? `<p class="pic sec centro">${t('test.scrivi')}</p>` : ''}`;
       centro = (libera ? '' : `<div class="num centro ${T.fase === 'fatto' ? 'sec' : ''}" id="t-tempo" style="font-size:56px;line-height:1">${T.fase === 'fatto' ? t('test.tempoScaduto') : mmss(p.durata)}</div>`) + (T.fase === 'pronto' && !libera ? '' : contatore);
       sotto = T.fase === 'pronto' && !libera ? `<div class="fondo-fisso"><button class="btn primario largo" data-a="via">${t('test.via')}</button></div>`   // sempre in vista, anche se con la figura la pagina scorre
-        : T.fase === 'via' ? '' : `<button class="btn primario largo" data-a="conferma">${t('comune.conferma')}</button>${p.id === 'trazioni' ? `<button class="btn largo" data-a="saltaTrazioni">${t('test.saltaProva')}</button>` : `<button class="btn largo" data-a="ripeti">${t('test.ripeti')}</button>`}`;
+        : T.fase === 'via' ? daCapo : `<button class="btn primario largo" data-a="conferma">${t('comune.conferma')}</button>${p.id === 'trazioni' ? `<button class="btn largo" data-a="saltaTrazioni">${t('test.saltaProva')}</button>` : `<button class="btn largo" data-a="ripeti">${t('test.ripeti')}</button>`}`;
     }
     html = `${testa(titolo)}
       <div><h1>${t('prove.' + p.id + '.nome')}${p.facilitata && T.fac[p.id] ? ` <span class="pill ar" style="vertical-align:middle">${t('test.facilitata')}</span>` : ''}</h1>
@@ -143,6 +144,10 @@ registra('test', ([tipo = 'mensile']) => {
       figura: alternaFigura,
       stop: fermaTenuta,
       ripeti: () => { T.conta = 0; T.tenuta = 0; passa('pronto'); },
+      ricomincia: async () => {   // il risultato può solo uscire più basso (si riparte già un po' stanchi), mai più alto
+        const ok = await conferma(t('test.ricominciaTitolo'), t('test.ricominciaTesto'), t('test.ricominciaOk'), t('comune.continua'));
+        if (ok && T && ['via', 'fatto'].includes(T.fase)) { T.conta = 0; T.tenuta = 0; passa('pronto'); }
+      },
       conferma: confermaProva,
       saltaRecupero: () => passa('pronto'),
       bpmFine: el => { T.battito.fine = el.value; },

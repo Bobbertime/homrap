@@ -6,7 +6,7 @@
 // Variabili utili: CHROME=/percorso/di/chrome per usare un Chrome già installato; MODULI=/cartella/node_modules se Playwright è altrove.
 // Lo script avvia da solo un piccolo server sulla cartella del progetto, carica i dati di esempio (demo) e controlla che ogni
 // schermata si apra senza errori e senza scorrimento orizzontale, più i percorsi principali: report, ritorno indietro,
-// figure animate, ripetizioni scritte a mano nel test, lingua, import di un file dell'orologio, correzione ed eliminazione di una sessione.
+// figure animate, ripetizioni scritte a mano nel test, ricominciare da zero (test, riscaldamento, AMRAP), timer dell'esercizio a tempo, «?» con figura e consigli, cambio di posizione nel riscaldamento, lingua, import di un file dell'orologio, correzione ed eliminazione di una sessione.
 import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -89,6 +89,9 @@ for (const tema of ['dark', 'light']) {
   esito('un esercizio senza figura si apre lo stesso', (await page.locator('.figura').count()) === 0 && (await page.locator('.sagoma').count()) === 1);
   await vai('test/mensile'); await page.click('[data-a="inizia"]'); await pausa(250);
   esito('nel test la prova mostra la figura', (await page.locator('.figura svg animate').count()) >= 5 && (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0);
+  await page.click('[data-a="via"]'); await pausa(3400); await page.click('[data-a="piu"]'); await page.click('[data-a="piu"]');
+  await page.click('[data-a="ricomincia"]'); await pausa(200); await page.click('.foglio [data-a="ok"]'); await pausa(300);
+  esito('una prova del test si può ricominciare da zero', (await page.locator('[data-a="via"]').count()) === 1 && (await page.locator('#t-conta').count()) === 0 && (await page.locator('#t-tempo').innerText()) === '1:00');
   await page.click('[data-a="via"]'); await pausa(3400); await page.click('[data-a="piu"]');
   await page.evaluate(() => { const vero = Date.now; Date.now = () => vero() + 61000; }); await pausa(500);   // salta alla fine del minuto
   await page.fill('#t-conta', '30'); await page.click('[data-a="piu"]');
@@ -101,6 +104,36 @@ for (const tema of ['dark', 'light']) {
   await page.goto(BASE + 'tests/figure.html?id=bird_dog'); await pausa(400);
   esito('anteprima di una figura sola, con i fotogrammi', (await page.locator('.quadri svg').count()) === 8);
   await vai('oggi');
+
+  // Allenamento: ricominciare un passo del riscaldamento, timer dell'esercizio a tempo, «Ricomincia da zero», «+1 GIRO» sempre in vista
+  await vai('allenamento/giorno'); await page.click('[data-a="riscaldamento"]'); await pausa(2300);
+  const passo = await page.locator('#g-tempo').innerText(); await page.click('[data-a="ricominciaPasso"]'); await pausa(150);
+  esito('un passo del riscaldamento si può ricominciare', passo !== '1:00' && (await page.locator('#g-tempo').innerText()) === '1:00', `${passo} → ${await page.locator('#g-tempo').innerText()}`);
+  await page.click('[data-a="avantiGuida"]'); await pausa(200);
+  esito('tra un passo e l\'altro del riscaldamento ci sono 10 secondi per cambiare posizione', ['0:10', '0:09'].includes(await page.locator('#g-tempo').innerText()) && (await page.locator('main').innerText()).includes('Cambia posizione') && (await page.locator('main .figura-svg').count()) === 1);
+  await page.click('main [data-a="aiuto"]'); await pausa(200);
+  esito('il «?» del cambio di posizione apre la scheda del passo dopo', (await page.locator('.foglio h2').innerText()) === 'Cat-cow');
+  await page.click('.foglio [data-a="chiudi"]'); await pausa(150); await page.click('[data-a="avantiGuida"]'); await pausa(200);
+  esito('«Sono pronto» fa partire subito il passo, con il suo tempo pieno', (await page.locator('#g-tempo').innerText()) === '0:45');
+  await vai('oggi'); await vai('allenamento/giorno'); await page.click('[data-a="salta"]'); await pausa(3700);
+  await page.click('[data-a="giro"]'); await pausa(150);
+  for (let i = 0; i < 5 && !(await page.locator('[data-a="crono"]').count()); i++) { await page.click('[data-a="esercizio"]'); await pausa(150); }
+  esito('l\'esercizio a tempo ha il suo timer', (await page.locator('#a-crono').count()) === 1 && (await page.locator('#a-crono').innerText()) === '0:30');
+  await page.click('.es-carta .aiuto'); await pausa(250);
+  esito('il «?» apre figura e consigli senza lasciare l\'allenamento', (await page.locator('.foglio h2').innerText()) === 'Plank' && (await page.locator('.foglio .figura-svg').count()) === 1 && (await page.locator('.foglio .punti li').count()) >= 5 && (await hash()) === '#/allenamento/giorno');
+  await page.click('.foglio [data-a="chiudi"]'); await pausa(200);
+  esito('chiuso il foglio si resta sullo stesso esercizio', (await page.locator('.foglio').count()) === 0 && (await page.locator('#a-crono').count()) === 1);
+  const sotto = async () => { const r = []; for (const h of [667, 844]) { await page.setViewportSize({ width: 390, height: h }); await pausa(120); r.push(await page.evaluate(() => { const g = document.querySelector('.piu-giro').getBoundingClientRect(); return g.bottom <= innerHeight + 1 && g.height >= 90; })); } await page.setViewportSize({ width: 390, height: 844 }); return r.every(Boolean); };
+  esito('«+1 GIRO» resta intero sullo schermo anche a 667 px, con il timer dell\'esercizio', await sotto());
+  await page.click('[data-a="crono"]'); await pausa(2300); const corso = await page.locator('#a-crono').innerText();
+  await page.click('[data-a="crono"]'); await pausa(300);
+  esito('«Da capo» fa ripartire da zero il timer dell\'esercizio', ['0:28', '0:27'].includes(corso) && (await page.locator('#a-crono').innerText()) === '0:30', `${corso} → ${await page.locator('#a-crono').innerText()}`);
+  await page.click('[data-a="pausa"]'); await pausa(150); await page.click('[data-a="ricomincia"]'); await pausa(200); await page.click('.foglio [data-a="ok"]'); await pausa(3700);
+  const pieno = await stato(S => S.attivo.durata * 60), letto = await page.locator('#a-tempo').innerText(), [mm, ss] = letto.split(':').map(Number);
+  esito('in pausa si ricomincia da zero: tempo pieno e giri azzerati', (await page.locator('#a-giro').innerText()) === '1' && pieno - (mm * 60 + ss) <= 1, `giro ${await page.locator('#a-giro').innerText()}, tempo ${letto}`);
+  await page.click('[data-a="esci"]'); await pausa(200);
+  esito('«Ricomincia da zero» anche dal foglio di uscita', (await page.locator('.foglio [data-a="ricomincia"]').count()) === 1);
+  await page.click('.foglio [data-a="scarta"]'); await pausa(300);
 
   // Testo dell'interfaccia non selezionabile, campi sì
   await vai('modifica/chi');
